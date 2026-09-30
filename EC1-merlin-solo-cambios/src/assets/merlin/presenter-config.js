@@ -1,0 +1,338 @@
+'use strict';
+// Configuración del presentador Merlín.
+// Para usar tus ajustes: en la página "Merlín en el set", copia todo el texto de "Valores para Claude Code"
+// y reemplaza el objeto de abajo (desde la primera { hasta la última }), dejando el punto y coma final.
+window.MERLIN_CONFIG = {
+  "modelo": "MERLIN1_CORREGIDO.glb (pesos del pico/ojos en CUERPO pasados a CABEZA)",
+  "rotacion": "grados, relativos a la pose de reposo: bone.quaternion = rest * Euler(x,y,z, orden ZYX)",
+  "lipSync": {
+    "hueso": "BOCA_INF",
+    "eje": "x",
+    "cerrado": 0,
+    "abiertoMax": -30,
+    "sensibilidad": 9,
+    "umbralRMS": 0.012,
+    "cierrePorSegundo": 12,
+    "aperturaPorSegundo": 35,
+    "picoSuperior": {
+      "hueso": "BOCA_SUP",
+      "eje": "x",
+      "factor": 0.35,
+      "signo": "+"
+    }
+  },
+  "parpadeo": {
+    "hueso": "PARPADOS_MAYA",
+    "eje": "x",
+    "abierto": 0,
+    "cerrado": 121,
+    "cadaSegundos": [
+      3,
+      6
+    ],
+    "duracionMs": 160
+  },
+  "ojos": {
+    "huesos": [
+      "OJO_R",
+      "OJO_L"
+    ],
+    "ejeVertical": "x (+ abajo)",
+    "ejeHorizontal": "z"
+  },
+  "cabeza": {
+    "hueso": "CABEZA",
+    "asentir": "x",
+    "girar": "y",
+    "inclinar": "z",
+    "acompanaAlHablar": 0
+  },
+  "columna": {
+    "hueso": "COLUMNA",
+    "respiracion": "x"
+  },
+  "alas": {
+    "alHablar": {
+      "intensidad": 0.6,
+      "subir": "hasta ~10° + gesto de 12° en acentos (35% de probabilidad)",
+      "adelante": "eje X +, hasta ~7° + gesto 10°",
+      "energia": "mouth suavizado (sube 2.5/s, baja 0.8/s)"
+    },
+    "nota": "reparentar ALA_SUP_R y ALA_SUP_L a COLUMNA con attach() al cargar y recapturar su rotación de reposo",
+    "bajar": {
+      "ALA_SUP_R": {
+        "eje": "z",
+        "grados": -60
+      },
+      "ALA_SUP_L": {
+        "eje": "z",
+        "grados": 60
+      }
+    }
+  },
+  "escena": {
+    "capas": [
+      "FONDO_SET",
+      "SILLA",
+      "Merlín (canvas transparente)",
+      "MESA",
+      "MICROFONO",
+      "vasos"
+    ],
+    "camara": {
+      "fov": 26,
+      "posicion": [
+        0,
+        1.45,
+        3.4
+      ],
+      "mira": [
+        0,
+        0.45,
+        0
+      ]
+    },
+    "merlin": {
+      "x": 0.27,
+      "y": -0.03,
+      "escala": 1.15,
+      "giroY": -22,
+      "cabezaMiraCamara": 0.6
+    },
+    "sombraSilla": 0.2,
+    "silla": {
+      "escala": 0.66,
+      "centroX": 0.59,
+      "bordeSuperiorY": 0.33,
+      "nota": "fracciones del ancho/alto del cuadro; capa original centro X 0.5286, borde superior 0.1151"
+    },
+    "microfono": {
+      "escala": 0.45,
+      "baseX": 0.16,
+      "baseY": 0.69,
+      "rotacion": 0,
+      "nota": "ancla = base del brazo, en la capa en (0.125, 0.70)"
+    },
+    "vasos": {
+      "escala": 0.27,
+      "x": 0.238,
+      "y": 0.776,
+      "nota": "ancla = centro inferior, en la capa en (0.499, 0.793)"
+    }
+  },
+  "camaras": {
+    "planos": [
+      {
+        "nombre": "General",
+        "zoom": 1,
+        "desplazX": 0,
+        "desplazY": 0,
+        "centradoEnCabeza": false
+      },
+      {
+        "nombre": "Medio",
+        "zoom": 1.75,
+        "desplazX": -0.03,
+        "desplazY": -0.02,
+        "centradoEnCabeza": true
+      },
+      {
+        "nombre": "Primer plano",
+        "zoom": 2.3,
+        "desplazX": -0.02,
+        "desplazY": -0.05,
+        "centradoEnCabeza": true
+      }
+    ],
+    "direccionAutomatica": true,
+    "alternanciaSeg": 12,
+    "planoMedioMerlinX": 0.3,
+    "usoPorSegmento": {
+      "presentacion": "General",
+      "regresoDeEnlatadoOAnuncio": "General",
+      "noticia": "Medio con Merlín a la izquierda (x en pantalla 0.3) y recuadro de imagen a la derecha; alterna recuadro y pantalla completa cada 12 s",
+      "despedidaOPaseACorte": "Primer plano"
+    },
+    "nota": "EC1 debe enviar con cada audio el tipo de segmento: intro | news | return | outro, más la imagen y el titular en las noticias",
+    "transicion": "cut",
+    "acercamientoLento": "+4% durante el plano",
+    "metodo": "CSS transform (translate+scale) en las capas de atrás y de adelante; el 3D usa camera.setViewOffset con el mismo recorte"
+  },
+  "imagenApoyo": {
+    "cuadroPared": {
+      "activo": true,
+      "esquinas": [
+        [
+          0.7602,
+          0.2
+        ],
+        [
+          0.9025,
+          0.2063
+        ],
+        [
+          0.8984,
+          0.3914
+        ],
+        [
+          0.7548,
+          0.3799
+        ]
+      ],
+      "capa": "detrás de la silla, se mueve con las cámaras"
+    },
+    "tablet": {
+      "activo": true,
+      "esquinas": [
+        [
+          0.8194,
+          0.5395
+        ],
+        [
+          0.8678,
+          0.4951
+        ],
+        [
+          0.9087,
+          0.6382
+        ],
+        [
+          0.8585,
+          0.6908
+        ]
+      ],
+      "capa": "sobre la mesa"
+    },
+    "grande": "ots",
+    "recuadro": {
+      "lado": "auto",
+      "anchoMax": 0.4,
+      "desplazX": 0,
+      "top": 0.06,
+      "aspecto": "16:9",
+      "regla": "se ubica en el lado opuesto a la cabeza de Merlín (proyección del hueso CABEZA), separado 0.13×escala; ancho mínimo 22%",
+      "animacion": "entra deslizándose + zoom lento"
+    },
+    "pantallaCompleta": "fundido + zoom lento",
+    "zocalo": {
+      "planoMedio": "solo p.title en cintillo centrado de 90% de ancho (left/right 5%, bottom 6%), alto fijo de 2 renglones, padding 28/48px, máx. 2 líneas (50px@1920, peso 900, fondo lowerBg, borde izquierdo categoryBg)",
+      "pantallaCompleta": "réplica del #lower de EC1: shade + metaRow (p.category, p.pubDate, p.isExclusive) + p.title 70px + p.summary 34px, colores y tipografías de design"
+    },
+    "datosDeEC1": {
+      "evento": "output:story",
+      "kind": "news | canned | ad",
+      "campos": {
+        "imagen": "p.image || p.fallbackImage",
+        "titular": "p.title",
+        "bajada": "p.summary",
+        "categoria": "p.category",
+        "fecha": "p.pubDate || p.date",
+        "exclusivo": "p.isExclusive",
+        "audio": "p.audioUrl"
+      },
+      "diseno": "output:design (fontFamily, titleColor, summaryColor, dateColor, categoryBgColor, categoryTextColor, lowerBgColor, lowerOpacity, tamaños y pesos de output-0324)",
+      "segmentos": "EC1 hoy solo tiene news, canned y ad. Presentación y despedida serían tipos nuevos; el regreso se detecta cuando llega una news después de un canned o ad (plano general al inicio).",
+      "conexion": "la página puede escuchar el mismo EventSource /events del servidor LAN de EC1 (output-web-adapter.js), igual que output-web.html"
+    },
+    "ejemplo": {
+      "titular": "",
+      "bajada": "",
+      "categoria": "ACTUALIDAD",
+      "fecha": "",
+      "exclusivo": false
+    },
+    "alternarEnNoticias": true,
+    "nota": "mapeo en perspectiva con CSS matrix3d desde 4 esquinas; EC1 enviaría la URL de la imagen y el titular de cada noticia por WebSocket"
+  },
+  "vida": {
+    "parpadeo": true,
+    "miradas": true,
+    "balanceoCabeza": true,
+    "respiracion": true,
+    "alasIndependientes": true
+  },
+  "integracion": {
+    "entornoDesdeFoto": true,
+    "reboteMesa": {
+      "color": "#d98a45",
+      "intensidad": 0.45,
+      "desde": [
+        0,
+        -1.5,
+        2
+      ]
+    },
+    "sombraMesa": {
+      "intensidad": 0.36,
+      "lineaMesaPantallaY": 0.63,
+      "nota": "oscurece fragmentos con Y de mundo cerca del borde de la mesa (onBeforeCompile)"
+    },
+    "plumas": {
+      "normalMapRuido": true,
+      "repeticion": 10,
+      "intensidad": 0.35
+    },
+    "blancoCalido": 0.05,
+    "filtroCSS": "sepia(0.04) saturate(0.95) contrast(0.97) blur(0.4px)",
+    "grano": 0.16,
+    "materiales": "MeshPhysicalMaterial respetando rugosidad/metalizado de Blender; MERLIN y ALAS PLUMAS: sheen 0.5/0.4 + normal de plumas; SOMBRERO sheen 0.4; LENTES y OJO clearcoat; metalizado del cuerpo = slider"
+  },
+  "iluminacion": {
+    "toneMapping": "ACESFilmic",
+    "exposicion": 0.8,
+    "luzPrincipal": 1,
+    "colorPrincipal": "#ffe4c4 desde arriba-derecha",
+    "lampara": "#ffc870 0.35 desde izquierda",
+    "relleno": 0.5,
+    "contraluz": 0.6,
+    "reflejosEntorno": 0.5,
+    "metalizado": 0
+  },
+  "ajusteManual": {
+    "BOCA_INF": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "BOCA_SUP": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "PARPADOS_MAYA": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "OJO_R": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "OJO_L": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "CABEZA": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "COLUMNA": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ALA_SUP_R": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ALA_SUP_L": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    }
+  }
+};

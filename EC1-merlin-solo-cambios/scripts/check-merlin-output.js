@@ -1,0 +1,12 @@
+'use strict';
+// Verifica que la salida de Merlín esté completa y respete el contrato de output.js.
+const fs=require('fs'),path=require('path'),src=path.join(__dirname,'..','src');
+const must=['output-merlin.html','output-merlin-web.html','output-merlin.js','output-merlin.css','renderer-merlin.js','vendor/three/three.min.js','vendor/three/GLTFLoader.js','vendor/three/RoomEnvironment.js','assets/merlin/merlin-model.js','assets/merlin/presenter-config.js','assets/merlin/fondo.jpg','assets/merlin/silla.webp','assets/merlin/mesa.webp','assets/merlin/mic.webp','assets/merlin/vasos.webp'];
+for(const f of must)if(!fs.existsSync(path.join(src,f)))throw new Error('Falta '+f);
+const js=fs.readFileSync(path.join(src,'output-merlin.js'),'utf8');
+for(const k of ["'output:story'","'output:design'","'output:control'","outputPlayback","p.audioUrl","p.title","p.summary","p.image","p.videoUrl"])if(!js.includes(k))throw new Error('output-merlin.js no maneja '+k);
+const main=fs.readFileSync(path.join(src,'main.js'),'utf8');if(!main.includes('outputPageFile()')||!main.includes("'presenter:set'"))throw new Error('main.js sin selector de presentador');
+const pre=fs.readFileSync(path.join(src,'preload.js'),'utf8');if(!pre.includes("page==='output-merlin.html'"))throw new Error('preload.js no expone ECAPI a output-merlin.html');
+const lan=fs.readFileSync(path.join(src,'services','outputLanServer.js'),'utf8');if(!lan.includes("'/merlin'"))throw new Error('outputLanServer.js sin ruta /merlin');
+const cfg=fs.readFileSync(path.join(src,'assets','merlin','presenter-config.js'),'utf8');if(!/window\.MERLIN_CONFIG\s*=\s*\{/.test(cfg))throw new Error('presenter-config.js inválido');
+console.log('check-merlin-output OK');
