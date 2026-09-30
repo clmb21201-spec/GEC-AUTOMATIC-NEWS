@@ -3,7 +3,6 @@
 // Para usar tus ajustes: en la página "Merlín en el set", copia todo el texto de "Valores para Claude Code"
 // y reemplaza el objeto de abajo (desde la primera { hasta la última }), dejando el punto y coma final.
 window.MERLIN_CONFIG = {
-{
   "modelo": "MERLIN1_CORREGIDO.glb (pesos del pico/ojos en CUERPO pasados a CABEZA)",
   "rotacion": "grados, relativos a la pose de reposo: bone.quaternion = rest * Euler(x,y,z, orden ZYX)",
   "lipSync": {
@@ -336,5 +335,4 @@ window.MERLIN_CONFIG = {
       "z": 0
     }
   }
-}
 };
