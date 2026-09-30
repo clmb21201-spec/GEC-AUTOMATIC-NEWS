@@ -8,5 +8,5 @@ for(const k of ["'output:story'","'output:design'","'output:control'","outputPla
 const main=fs.readFileSync(path.join(src,'main.js'),'utf8');if(!main.includes('outputPageFile()')||!main.includes("'presenter:set'"))throw new Error('main.js sin selector de presentador');
 const pre=fs.readFileSync(path.join(src,'preload.js'),'utf8');if(!pre.includes("page==='output-merlin.html'"))throw new Error('preload.js no expone ECAPI a output-merlin.html');
 const lan=fs.readFileSync(path.join(src,'services','outputLanServer.js'),'utf8');if(!lan.includes("'/merlin'"))throw new Error('outputLanServer.js sin ruta /merlin');
-const cfg=fs.readFileSync(path.join(src,'assets','merlin','presenter-config.js'),'utf8');if(!/window\.MERLIN_CONFIG\s*=\s*\{/.test(cfg))throw new Error('presenter-config.js inválido');
+const cfg=fs.readFileSync(path.join(src,'assets','merlin','presenter-config.js'),'utf8');const sandbox={window:{}};try{require('vm').runInNewContext(cfg,sandbox);}catch(e){throw new Error('presenter-config.js tiene un error de sintaxis (¿llaves de más al pegar?): '+e.message);}const mc=sandbox.window.MERLIN_CONFIG;if(!mc||typeof mc!=='object'||!mc.escena||!mc.camaras)throw new Error('presenter-config.js no define MERLIN_CONFIG con escena y camaras');
 console.log('check-merlin-output OK');
