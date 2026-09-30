@@ -3,6 +3,7 @@
 // Para usar tus ajustes: en la página "Merlín en el set", copia todo el texto de "Valores para Claude Code"
 // y reemplaza el objeto de abajo (desde la primera { hasta la última }), dejando el punto y coma final.
 window.MERLIN_CONFIG = {
+{
   "modelo": "MERLIN1_CORREGIDO.glb (pesos del pico/ojos en CUERPO pasados a CABEZA)",
   "rotacion": "grados, relativos a la pose de reposo: bone.quaternion = rest * Euler(x,y,z, orden ZYX)",
   "lipSync": {
@@ -10,7 +11,7 @@ window.MERLIN_CONFIG = {
     "eje": "x",
     "cerrado": 0,
     "abiertoMax": -30,
-    "sensibilidad": 9,
+    "sensibilidad": 11.5,
     "umbralRMS": 0.012,
     "cierrePorSegundo": 12,
     "aperturaPorSegundo": 35,
@@ -53,7 +54,7 @@ window.MERLIN_CONFIG = {
   },
   "alas": {
     "alHablar": {
-      "intensidad": 0.6,
+      "intensidad": 1.15,
       "subir": "hasta ~10° + gesto de 12° en acentos (35% de probabilidad)",
       "adelante": "eje X +, hasta ~7° + gesto 10°",
       "energia": "mouth suavizado (sube 2.5/s, baja 0.8/s)"
@@ -83,7 +84,7 @@ window.MERLIN_CONFIG = {
       "fov": 26,
       "posicion": [
         0,
-        1.45,
+        1.4,
         3.4
       ],
       "mira": [
@@ -93,30 +94,30 @@ window.MERLIN_CONFIG = {
       ]
     },
     "merlin": {
-      "x": 0.27,
-      "y": -0.03,
-      "escala": 1.15,
-      "giroY": -22,
-      "cabezaMiraCamara": 0.6
+      "x": -0.17,
+      "y": 0.07,
+      "escala": 1.07,
+      "giroY": 33,
+      "cabezaMiraCamara": 0.75
     },
     "sombraSilla": 0.2,
     "silla": {
-      "escala": 0.66,
-      "centroX": 0.59,
-      "bordeSuperiorY": 0.33,
+      "escala": 0.52,
+      "centroX": 0.43,
+      "bordeSuperiorY": 0.35,
       "nota": "fracciones del ancho/alto del cuadro; capa original centro X 0.5286, borde superior 0.1151"
     },
     "microfono": {
-      "escala": 0.45,
-      "baseX": 0.16,
-      "baseY": 0.69,
-      "rotacion": 0,
+      "escala": 0.46,
+      "baseX": 0.146,
+      "baseY": 0.716,
+      "rotacion": -0.5,
       "nota": "ancla = base del brazo, en la capa en (0.125, 0.70)"
     },
     "vasos": {
       "escala": 0.27,
-      "x": 0.238,
-      "y": 0.776,
+      "x": 0.206,
+      "y": 0.83,
       "nota": "ancla = centro inferior, en la capa en (0.499, 0.793)"
     }
   },
@@ -124,23 +125,23 @@ window.MERLIN_CONFIG = {
     "planos": [
       {
         "nombre": "General",
-        "zoom": 1,
-        "desplazX": 0,
-        "desplazY": 0,
+        "zoom": 1.1,
+        "desplazX": -0.07,
+        "desplazY": -0.03,
         "centradoEnCabeza": false
       },
       {
         "nombre": "Medio",
-        "zoom": 1.75,
-        "desplazX": -0.03,
-        "desplazY": -0.02,
+        "zoom": 1.45,
+        "desplazX": 0.11,
+        "desplazY": -0.03,
         "centradoEnCabeza": true
       },
       {
         "nombre": "Primer plano",
-        "zoom": 2.3,
-        "desplazX": -0.02,
-        "desplazY": -0.05,
+        "zoom": 2.2,
+        "desplazX": 0,
+        "desplazY": -0.07,
         "centradoEnCabeza": true
       }
     ],
@@ -154,13 +155,13 @@ window.MERLIN_CONFIG = {
       "despedidaOPaseACorte": "Primer plano"
     },
     "nota": "EC1 debe enviar con cada audio el tipo de segmento: intro | news | return | outro, más la imagen y el titular en las noticias",
-    "transicion": "cut",
+    "transicion": "smooth",
     "acercamientoLento": "+4% durante el plano",
     "metodo": "CSS transform (translate+scale) en las capas de atrás y de adelante; el 3D usa camera.setViewOffset con el mismo recorte"
   },
   "imagenApoyo": {
     "cuadroPared": {
-      "activo": true,
+      "activo": false,
       "esquinas": [
         [
           0.7602,
@@ -182,7 +183,7 @@ window.MERLIN_CONFIG = {
       "capa": "detrás de la silla, se mueve con las cámaras"
     },
     "tablet": {
-      "activo": true,
+      "activo": false,
       "esquinas": [
         [
           0.8194,
@@ -205,10 +206,10 @@ window.MERLIN_CONFIG = {
     },
     "grande": "ots",
     "recuadro": {
-      "lado": "auto",
-      "anchoMax": 0.4,
-      "desplazX": 0,
-      "top": 0.06,
+      "lado": "right",
+      "anchoMax": 0.44,
+      "desplazX": -0.01,
+      "top": 0.235,
       "aspecto": "16:9",
       "regla": "se ubica en el lado opuesto a la cabeza de Merlín (proyección del hueso CABEZA), separado 0.13×escala; ancho mínimo 22%",
       "animacion": "entra deslizándose + zoom lento"
@@ -235,11 +236,11 @@ window.MERLIN_CONFIG = {
       "conexion": "la página puede escuchar el mismo EventSource /events del servidor LAN de EC1 (output-web-adapter.js), igual que output-web.html"
     },
     "ejemplo": {
-      "titular": "",
-      "bajada": "",
+      "titular": "Golpe de estado hemor perdido la autonomía del poder",
+      "bajada": "ES HORA DE REZAR POQUE DE AQUI EN ADELANTE YA NO HABRÁ SALVACIÓN",
       "categoria": "ACTUALIDAD",
       "fecha": "",
-      "exclusivo": false
+      "exclusivo": true
     },
     "alternarEnNoticias": true,
     "nota": "mapeo en perspectiva con CSS matrix3d desde 4 esquinas; EC1 enviaría la URL de la imagen y el titular de cada noticia por WebSocket"
@@ -255,7 +256,7 @@ window.MERLIN_CONFIG = {
     "entornoDesdeFoto": true,
     "reboteMesa": {
       "color": "#d98a45",
-      "intensidad": 0.45,
+      "intensidad": 0.9,
       "desde": [
         0,
         -1.5,
@@ -263,30 +264,30 @@ window.MERLIN_CONFIG = {
       ]
     },
     "sombraMesa": {
-      "intensidad": 0.36,
-      "lineaMesaPantallaY": 0.63,
+      "intensidad": 0.48,
+      "lineaMesaPantallaY": 0.64,
       "nota": "oscurece fragmentos con Y de mundo cerca del borde de la mesa (onBeforeCompile)"
     },
     "plumas": {
       "normalMapRuido": true,
       "repeticion": 10,
-      "intensidad": 0.35
+      "intensidad": 0.15
     },
-    "blancoCalido": 0.05,
-    "filtroCSS": "sepia(0.04) saturate(0.95) contrast(0.97) blur(0.4px)",
-    "grano": 0.16,
+    "blancoCalido": 0.2,
+    "filtroCSS": "sepia(0.08) saturate(0.84) contrast(1.08) blur(0.4px)",
+    "grano": 0.02,
     "materiales": "MeshPhysicalMaterial respetando rugosidad/metalizado de Blender; MERLIN y ALAS PLUMAS: sheen 0.5/0.4 + normal de plumas; SOMBRERO sheen 0.4; LENTES y OJO clearcoat; metalizado del cuerpo = slider"
   },
   "iluminacion": {
     "toneMapping": "ACESFilmic",
     "exposicion": 0.8,
-    "luzPrincipal": 1,
+    "luzPrincipal": 1.15,
     "colorPrincipal": "#ffe4c4 desde arriba-derecha",
     "lampara": "#ffc870 0.35 desde izquierda",
     "relleno": 0.5,
     "contraluz": 0.6,
-    "reflejosEntorno": 0.5,
-    "metalizado": 0
+    "reflejosEntorno": 0.8,
+    "metalizado": 0.3
   },
   "ajusteManual": {
     "BOCA_INF": {
@@ -335,4 +336,5 @@ window.MERLIN_CONFIG = {
       "z": 0
     }
   }
+}
 };
