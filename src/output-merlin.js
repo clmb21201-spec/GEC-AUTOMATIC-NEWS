@@ -460,7 +460,9 @@ async function startMusic(){
 function hideCanned(){
   const layer = $('cannedLayer'); if (!layer.classList.contains('on')) return;
   renderPaused = false; layer.classList.remove('on');
-  setTimeout(() => { if (activeKind === 'news') { try { video.pause(); video.removeAttribute('src'); video.load(); } catch {} } }, 800);
+  // Lab.30: el video se pausa en el acto (antes seguía sonando bajo Merlín en la despedida o el pase)
+  try { video.pause(); } catch {}
+  setTimeout(() => { if (activeKind !== 'canned') { try { video.removeAttribute('src'); video.load(); } catch {} } }, 800);
 }
 // ---- video de espera (standby), igual que output-0331.js: al abrir la salida y tras 'stop'
 const standbyEl = $('standbyLayer'), standbyVideo = $('standbyVideo');

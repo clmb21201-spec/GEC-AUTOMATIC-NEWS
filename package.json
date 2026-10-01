@@ -97,6 +97,10 @@
       {
         "from": "src/voice_tools.py",
         "to": "runtime/kokoro/voice_tools.py"
+      },
+{
+        "from": "src/chatterbox_pause_cleanup_lab29.py",
+        "to": "runtime/tts-lab/chatterbox_pause_cleanup_lab29.py"
       }
     ],
     "extraFiles": [

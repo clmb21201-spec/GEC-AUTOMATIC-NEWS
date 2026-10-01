@@ -49,5 +49,19 @@ let checks=0;const ok=(v,m)=>{checks++;assert.ok(v,m);};
   ok(worker.includes('def _qwen_prompt_items(')&&worker.includes('ref_text=ref_text')&&worker.includes('VOICE_PROMPTS[key] = items'),'el worker debe pasar VoiceClonePromptItem con ref_text');
   ok(!/VOICE_PROMPTS\[key\] = packed/.test(worker),'el worker no debe pasar el dict sin transcripción a qwen_tts');
 
+  // 5) audio: el video se pausa al ocultarse (despedida/pase sobre un contenido) y la música no se normaliza
+  const out=read('output-merlin.js');
+  ok(/layer\.classList\.remove\('on'\);[\s\S]*try \{ video\.pause\(\); \} catch \{\}/.test(out.slice(out.indexOf('function hideCanned(){'),out.indexOf('function hideCanned(){')+600)),'hideCanned debe pausar el video en el acto');
+  const musicLines=out.split('\n').filter(l=>/music\.volume\s*=/.test(l));
+  ok(musicLines.length>0&&musicLines.every(l=>!l.includes('dbGain')),'la música de fondo no debe normalizarse');
+  ok(/video\.volume = [^;]*dbGain\(p\.audioGainDb\)/.test(out)&&/audio\.volume = [^;]*dbGain\(p\.audioGainDb\)/.test(out),'voz y contenidos deben normalizarse');
+
+  // 6) limpieza de pausas de Chatterbox: el script va fuera de app.asar y se busca ahí primero
+  const pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8'));
+  ok((pkg.build.extraResources||[]).some(x=>x.from==='src/chatterbox_pause_cleanup_lab29.py'&&x.to==='runtime/tts-lab/chatterbox_pause_cleanup_lab29.py'),'el script de limpieza debe copiarse fuera de app.asar');
+  const fin=read('services/releaseV2FinalCorrectionsLab29.js');
+  ok(fin.includes("path.join(process.resourcesPath,'runtime','tts-lab','chatterbox_pause_cleanup_lab29.py')")&&fin.includes('.asar'),'la limpieza debe usar la copia fuera de app.asar');
+  ok(read('services/releaseV2GpuIsolationLab30.js').includes('chatterbox-cleanup.log'),'la limpieza debe quedar registrada');
+
   console.log(`check-merlin-lab30 OK · ${checks} verificaciones`);
 })().catch(e=>{console.error(e);process.exit(1);});

@@ -125,11 +125,20 @@ function wrapQwenBench(baseQwenBench){
   };
 }
 
+// Registro de la limpieza de pausas de Chatterbox (chatterbox_pause_cleanup_lab29.py): artefactos silenciados o fallos.
+// Antes del Lab.30 el script no podía ejecutarse desde app.asar y el fallo no quedaba registrado en ningún lado.
+function logPauseCleanup(rt,result){
+  const c=result&&result.pauseCleanup;if(!c||c.skipped&&c.ok!==false)return;
+  if(c.ok!==false&&!c.pause_cleanup_applied)return;
+  const line=c.ok===false?`ERROR · ${String(c.error||'sin detalle').replace(/\s+/g,' ').slice(0,300)}`:`${c.pause_cleanup_events} artefacto(s) · ${c.pause_cleanup_ms} ms silenciados · fuertes ${c.pause_cleanup_strong_events||0} · débiles ${c.pause_cleanup_weak_events||0} · umbral ${c.pause_cleanup_threshold_db} dB`;
+  try{const dir=require('path').join(rt.dataDir||'.','logs');require('fs').mkdirSync(dir,{recursive:true});require('fs').promises.appendFile(require('path').join(dir,'chatterbox-cleanup.log'),`[${new Date().toISOString()}] ${line} · ${require('path').basename(String(result.path||''))}\n`).catch(()=>{});}catch{}
+}
+
 function installTtsPatches(){
   const t=TTSLabRuntime.prototype;if(t.__gecLab30Gpu)return;Object.defineProperty(t,'__gecLab30Gpu',{value:true});
   for(const name of ['ensureWorker','stopAndWait','stop']){const base=t[name];if(typeof base!=='function')continue;t[name]=function(...args){global.__gecLabRuntime=this;return base.apply(this,args);};}
   const baseGenerate=t.generate;
-  t.generate=async function(...args){global.__gecLabRuntime=this;throwIfCancelled();return baseGenerate.apply(this,args);};
+  t.generate=async function(...args){global.__gecLabRuntime=this;throwIfCancelled();const r=await baseGenerate.apply(this,args);if(String(args[0])==='chatterbox')logPauseCleanup(this,r);return r;};
   const baseQwenBench=t.benchmarkQwenPerformance;
   if(typeof baseQwenBench==='function')t.benchmarkQwenPerformance=wrapQwenBench(baseQwenBench);
   // Medición final de la voz (también Chatterbox): la IA de texto no debe seguir en la tarjeta.
