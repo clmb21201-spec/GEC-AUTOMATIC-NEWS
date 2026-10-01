@@ -32,6 +32,14 @@ Colores, tipografías (incluidas las importadas), tamaños y pesos del titular, 
 
 Opcional: `camaras.generalAlVolverSeg` (segundos de plano general al volver de una pausa, por defecto 4).
 
+## Vista previa en Diseño
+
+Con el modo Merlín y formato 16:9, la **Vista previa de emisión** de la pestaña Emisión muestra la salida real de Merlín (plano general y luego plano medio con el cintillo) con el diseño guardado y la nota de ejemplo. Es muda y solo se carga mientras está en pantalla, para no ocupar la GPU. Si el 3D no carga, queda la vista previa clásica con un aviso.
+
+## NDI
+
+NDI solo está disponible en la vista clásica: la ventana NDI usa la salida clásica. Con el modo Merlín, NDI se detiene, la tarjeta queda deshabilitada y muestra el aviso; al volver a la clásica se reanuda si estaba activado. En 9:16 la salida siempre es la clásica y NDI funciona normalmente.
+
 ## Salida por red local (OBS)
 
 Con la salida LAN activada, Merlín está en `http://IP-DEL-PC:PUERTO/merlin?k=CLAVE` (misma IP, puerto y clave que la salida web actual). En OBS: fuente de navegador de 1920×1080 con "Controlar audio mediante OBS".

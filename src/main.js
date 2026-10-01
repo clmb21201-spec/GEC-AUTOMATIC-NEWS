@@ -284,7 +284,7 @@ function readPresenter(){try{const v=JSON.parse(fs.readFileSync(presenterFile(),
 function outputPageFile(){const d=currentDesign?.()||{};if(d.format==='9:16')return'output.html';return readPresenter().mode==='merlin'?'output-merlin.html':'output.html';}
 ipcMain.handle('presenter:get',()=>readPresenter());
 ipcMain.handle('presenter:set',async(_,mode)=>{const next={mode:mode==='merlin'?'merlin':'clasico'};try{fs.mkdirSync(path.dirname(presenterFile()),{recursive:true});fs.writeFileSync(presenterFile(),JSON.stringify(next,null,2),'utf8');}catch(e){logEvent('PRESENTER_SAVE',e.message||e);throw e;}
-  logEvent('PRESENTER_MODE',next.mode);let reopened=false;if(next.mode==='merlin')setTimeout(()=>presenterHost.ensureClips().catch(()=>{}),1500);
+  logEvent('PRESENTER_MODE',next.mode);let reopened=false;if(next.mode==='merlin')setTimeout(()=>presenterHost.ensureClips().catch(()=>{}),1500);presenterNdiGuard.onModeChange().catch(()=>{});
   if(outputReady()){try{outputWindow.loadFile(path.join(__dirname,outputPageFile()));reopened=true;}catch(e){logEvent('PRESENTER_RELOAD',e.message||e);}}
   return{...next,reopened};});
 // ---- Presentador Merlín: intervenciones con frases fijas (presentación, pase a corte, regreso y despedida).
@@ -398,3 +398,16 @@ const mediaLoudness=(()=>{let inst=null;const {MediaLoudness}=require('./service
 })();
 {const __origDeliverLoudness=deliverToOutput;
  deliverToOutput=function(payload,source,autoOpen=false){if(payload?.kind==='canned'&&payload.videoUrl&&payload.audioGainDb==null){const g=mediaLoudness.gainForUrl(payload.videoUrl);if(g!=null)payload={...payload,audioGainDb:g};}return __origDeliverLoudness(payload,source,autoOpen);};}
+// ---- Merlín: NDI solo en la vista clásica. La ventana NDI carga la salida clásica (output.html?ndi=1); con Merlín activo
+// no se inicia, se detiene al cambiar a Merlín y vuelve sola al cambiar a clásica si estaba activado. El panel muestra el aviso.
+const presenterNdiGuard=(()=>{const {OutputNdi}=require('./services/outputNdi'),p=OutputNdi.prototype;
+  const MSG='NDI solo está disponible en la vista clásica. Cambia el Modo de salida a "Clásica" para usarlo.';
+  const blocked=()=>{try{return readPresenter().mode==='merlin'&&(currentDesign?.()||{}).format!=='9:16';}catch{return false;}};
+  if(!p.__gecMerlinNdiGuard){Object.defineProperty(p,'__gecMerlinNdiGuard',{value:true});const baseStart=p.start,baseStatus=p.status;
+    p.start=async function(...a){if(blocked()){await this.stop(false);this.emit();return this.status();}return baseStart.apply(this,a);};
+    p.status=function(...a){const s=baseStatus.apply(this,a);return blocked()?{...s,running:false,starting:false,error:MSG,merlinBlocked:true}:{...s,merlinBlocked:false};};}
+  async function onModeChange(){if(!outputNdi)return;
+    if(blocked()){await outputNdi.stop(false);destroyNdiWindow();outputNdi.emit();logEvent('PRESENTER_NDI','NDI detenido: solo disponible en la vista clásica');}
+    else{if(outputNdi.config?.enabled){await outputNdi.start();if(outputNdi.status().running)ensureNdiWindow();}outputNdi.emit();}}
+  return{onModeChange:()=>onModeChange().catch(e=>logEvent('PRESENTER_NDI',e.message||e)),blocked};
+})();

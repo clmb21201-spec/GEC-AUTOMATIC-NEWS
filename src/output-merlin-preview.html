@@ -1,0 +1,48 @@
+<!doctype html>
+<!-- Vista previa de Merlín para el área de Diseño del panel (renderer-merlin-preview-lab30.js). Misma escena que output-merlin.html; el diseño y una nota de ejemplo llegan por postMessage. -->
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>GEC · Vista previa Merlín</title>
+  <link rel="stylesheet" href="output-merlin.css">
+</head>
+<body>
+<div id="viewport">
+  <div id="stage">
+    <div class="set" id="set">
+      <div class="view" id="viewBack">
+        <img id="bg" alt="" src="assets/merlin/fondo.jpg">
+        <div class="plane" id="framePlane"><img alt=""><i class="glare paper"></i></div>
+        <img id="chair" alt="" src="assets/merlin/silla.webp" style="transform-origin:52.86% 11.51%">
+      </div>
+      <div class="view" id="viewFront">
+        <img id="desk" alt="" src="assets/merlin/mesa.webp">
+        <div class="plane" id="tabPlane"><img alt=""><i class="glare"></i></div>
+        <img id="mic" alt="" src="assets/merlin/mic.webp" style="transform-origin:12.5% 70%">
+        <img id="cups" alt="" src="assets/merlin/vasos.webp" style="transform-origin:49.9% 79.3%">
+      </div>
+      <div class="ots" id="ots"><div class="otsImg"><img alt=""></div></div>
+      <div class="full" id="full"><img alt=""><div class="ecShade"></div>
+        <div class="ecLower"><div class="ecMeta"><span class="ecCat" id="fCat"></span><span class="ecDate" id="fDate"></span><span class="ecExcl" id="fExcl">EXCLUSIVO</span></div>
+          <div class="ecTitle" id="fTitle"></div><div class="ecSummary" id="fSummary"></div></div></div>
+      <div class="lower" id="lower"><div class="lowerMeta"><span class="lCat" id="lCat"></span><span class="lExcl" id="lExcl">EXCLUSIVO</span></div><b><span id="lowerT"></span></b></div>
+      <div class="subs" id="subs"></div>
+      <div class="clock" id="clock"></div>
+      <div class="canned" id="cannedLayer"><video id="cannedVideo" preload="auto" playsinline></video></div>
+      <div class="standby on" id="standbyLayer"><video id="standbyVideo" muted loop playsinline></video></div>
+      <div class="grain" id="grain"></div>
+    </div>
+  </div>
+</div>
+<audio id="audio"></audio>
+<audio id="music" preload="auto"></audio>
+<script src="output-merlin-preview-adapter.js"></script>
+<script src="vendor/three/three.min.js"></script>
+<script src="vendor/three/GLTFLoader.js"></script>
+<script src="vendor/three/RoomEnvironment.js"></script>
+<script src="assets/merlin/merlin-model.js"></script>
+<script src="assets/merlin/presenter-config.js"></script>
+<script src="output-merlin.js"></script>
+</body>
+</html>

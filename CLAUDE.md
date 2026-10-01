@@ -44,6 +44,13 @@ Ver `INTEGRACION_MERLIN.md` (secciones "Diseño en pantalla", "Cámara", "Expres
 
 - Tono (`p.tone`): lo devuelve la IA editorial (`editorial.js`) y se agrega a todos los payloads de noticia. Volumen de enlatados y anuncios: `renderer-media-loudness.js` mide con Web Audio, `services/mediaLoudnessMerlin.js` guarda en `data/media-loudness.json` y `main.js` agrega `p.audioGainDb` al payload `kind:'canned'`.
 
+## Lab.30 (correcciones)
+
+- Merlín: NDI solo en la vista clásica (`presenterNdiGuard` al final de `main.js` + `renderer-merlin-ndi-lab30.js`); vista previa de Merlín en el área de Diseño (`renderer-merlin-preview-lab30.js` carga `output-merlin-preview.html`, muda, con `output-merlin-preview-adapter.js`).
+- Optimización: `services/releaseV2GpuIsolationLab30.js` libera la GPU entre voz e IA de texto (espera la salida real de los procesos), aborta si otro programa ocupa más de 2,5 GB de VRAM, mide la voz Qwen con 3 repeticiones sin la configuración de diagnóstico, descarta antes las configuraciones lentas de la IA de texto y permite cancelar (`renderer-optimization-lab30.js`: botón, tiempo transcurrido y restante).
+- Qwen zero-shot: `tts_lab_worker.py` pasa a `qwen_tts` los `VoiceClonePromptItem` con la transcripción (con el dict fallaba con `'NoneType' object is not subscriptable`).
+- Instalación de motores: `removeTorchShadow` es asíncrono (borrar PyTorch con `rmSync` congelaba la ventana).
+
 ## Pendiente
 
-- Integrar en modo Merlín la promo de YouTube y el envío por NDI, que hoy solo están en la salida clásica.
+- Integrar en modo Merlín la promo de YouTube y el envío por NDI (hoy NDI queda bloqueado con aviso en modo Merlín).

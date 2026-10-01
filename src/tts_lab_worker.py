@@ -775,6 +775,25 @@ def _pack_qwen_prompt(items):
     }
 
 
+def _qwen_prompt_items(packed, ref_text):
+    # qwen_tts descarta la transcripción cuando voice_clone_prompt llega como dict
+    # (ref_texts_for_ids=None) y en modo ICL falla con "'NoneType' object is not subscriptable".
+    # Se le pasa la lista de VoiceClonePromptItem con ref_text; la caché en disco sigue siendo el dict.
+    from qwen_tts.inference.qwen3_tts_model import VoiceClonePromptItem
+
+    count = len(packed.get("ref_spk_embedding") or [])
+    return [
+        VoiceClonePromptItem(
+            ref_code=packed["ref_code"][i],
+            ref_spk_embedding=packed["ref_spk_embedding"][i],
+            x_vector_only_mode=bool(packed["x_vector_only_mode"][i]),
+            icl_mode=bool(packed["icl_mode"][i]),
+            ref_text=ref_text,
+        )
+        for i in range(count)
+    ]
+
+
 def qwen_prompt(ref_audio, ref_text, cache_path="", params=None):
     import torch
 
@@ -816,8 +835,11 @@ def qwen_prompt(ref_audio, ref_text, cache_path="", params=None):
             os.makedirs(os.path.dirname(cache_path), exist_ok=True)
             torch.save(packed, cache_path)
 
-    VOICE_PROMPTS[key] = packed
-    return packed
+    items = _qwen_prompt_items(packed, ref_text)
+    if not items:
+        raise RuntimeError("Qwen3-TTS no pudo preparar la voz de referencia; vuelve a prepararla")
+    VOICE_PROMPTS[key] = items
+    return items
 
 
 def prepare_reference(payload):
