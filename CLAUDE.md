@@ -32,6 +32,12 @@ Ver `INTEGRACION_MERLIN.md`. Resumen:
 - Huesos usados: `BOCA_INF` (abre en X negativo), `BOCA_SUP` (X positivo), `PARPADOS_MAYA` (X: 0 abierto, 121 cerrado), `OJO_R`/`OJO_L`, `CABEZA`, `COLUMNA`, `ALA_SUP_R`/`ALA_SUP_L` (se reparentan a `COLUMNA` al cargar). Rotaciones relativas a la pose de reposo.
 - Respaldos: si WebGL o el modelo fallan, vuelve a `output.html`; si el análisis de audio queda bloqueado, lip sync sintético.
 
+## Intervenciones de Merlín (hechas)
+
+- Solo en modo Merlín y emisión automática: `intro` (primera pieza, plano general), `pase` (enlatado o anuncio tras una noticia, primer plano), `regreso` (primera noticia tras enlatado o anuncio, plano general) y `despedida` (al Detener emisión, primer plano; con una noticia al aire, espera a que termine).
+- Frases fijas editables en `src/assets/merlin/presenter-phrases.json`; audio con `kokoro.generate` cacheado en `data/presenter-voice/` (voz + texto). Si no hay audio listo, la intervención se salta.
+- Implementado con `presenterHost` (final de `src/main.js`) + `ECAPI.presenterHostPlayback`. La salida de Merlín también muestra el video de espera (`design.standbyVideoUrl`) al abrir y tras `stop`.
+
 ## Pendiente
 
-- Fase 2 de Merlín: segmentos de presentación y despedida (nuevo tipo `host` con `segment: 'intro' | 'outro'`, textos de la IA local, voz del TTS local, insertados por el planificador al inicio y antes de cada bloque de enlatados o anuncios).
+- Integrar en modo Merlín la promo de YouTube y el envío por NDI.

@@ -1,0 +1,30 @@
+{
+  "_nota": "Frases fijas de Merlín. Rotan al azar sin repetir la última. Se pueden editar; al cambiar un texto, su audio se vuelve a generar con la voz configurada.",
+  "intro": [
+    "Hola, soy Merlín y te acompaño con las noticias de El Comercio. Empezamos.",
+    "Bienvenidos. Soy Merlín y estas son las noticias más importantes del momento.",
+    "Hola, qué gusto tenerte por aquí. Soy Merlín, y arrancamos con la actualidad.",
+    "Muy buenas. Soy Merlín, de El Comercio, y te cuento lo que está pasando.",
+    "Hola de nuevo. Soy Merlín y comenzamos con las noticias del día."
+  ],
+  "pase": [
+    "Vamos a una pausa. No te vayas, volvemos enseguida.",
+    "Hacemos una breve pausa y regresamos con más noticias.",
+    "Ahora te dejo con este contenido. En un momento seguimos.",
+    "Una pausa y volvemos. Quédate con nosotros.",
+    "Mira esto y enseguida continuamos con la actualidad."
+  ],
+  "regreso": [
+    "Estamos de vuelta. Seguimos con más noticias.",
+    "Ya regresamos. Continuamos con la actualidad.",
+    "Aquí estamos otra vez. Vamos con la siguiente noticia.",
+    "De vuelta con ustedes. Seguimos informando.",
+    "Volvimos. Esto es lo que tienes que saber."
+  ],
+  "despedida": [
+    "Eso es todo por ahora. Soy Merlín, gracias por acompañarnos. Hasta la próxima.",
+    "Aquí terminamos. Gracias por estar con nosotros, nos vemos pronto.",
+    "Hasta aquí las noticias. Soy Merlín y te espero en la próxima edición.",
+    "Gracias por acompañarnos. Me despido, hasta pronto."
+  ]
+}

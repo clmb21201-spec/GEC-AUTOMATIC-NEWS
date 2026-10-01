@@ -285,6 +285,7 @@ function applyDesign(next = {}){
   $('fExcl').textContent = String(d.exclusiveText || 'EXCLUSIVO').slice(0, 32);
   audio.volume = vol(d.voiceVolume == null ? 100 : d.voiceVolume); video.volume = vol(d.cannedVolume == null ? 100 : d.cannedVolume);
   syncCustomFonts(d.customFonts).catch(() => {});
+  if (typeof setStandbySource === 'function') { setStandbySource(); standbyMusic(); }
 }
 function ecDate(v){ if (!v) return ''; const d = new Date(v); if (isNaN(d)) return ''; try { return new Intl.DateTimeFormat('es-PE',{day:'2-digit',month:'short',year:'numeric'}).format(d).replace(/\./g,'').toUpperCase(); } catch { return ''; } }
 
@@ -300,7 +301,7 @@ function ensureAudioGraph(){
   } catch (e) { log('Web Audio no disponible, se usa lip sync sintético', e); tainted = true; }
 }
 function readLevel(dt){
-  if (!analyser || audio.paused || audio.ended || activeKind !== 'news') { silentFrames = 0; return 0; }
+  if (!analyser || audio.paused || audio.ended || (activeKind !== 'news' && activeKind !== 'host')) { silentFrames = 0; return 0; }
   if (tainted) return synthLevel(dt);
   analyser.getFloatTimeDomainData(buf);
   let s = 0, peak = 0; for (let i=0;i<buf.length;i++) { s += buf[i]*buf[i]; peak = Math.max(peak, Math.abs(buf[i])); }
@@ -332,6 +333,37 @@ function hideCanned(){
   renderPaused = false; layer.classList.remove('on');
   setTimeout(() => { if (activeKind === 'news') { try { video.pause(); video.removeAttribute('src'); video.load(); } catch {} } }, 800);
 }
+// ---- video de espera (standby), igual que output-0331.js: al abrir la salida y tras 'stop'
+const standbyEl = $('standbyLayer'), standbyVideo = $('standbyVideo');
+let standbyOn = true, standbyTimer = null;
+function setStandbySource(){
+  const url = String(design.standbyVideoUrl || '');
+  if (!url) { standbyVideo.pause(); standbyVideo.removeAttribute('src'); try { standbyVideo.load(); } catch {} return; }
+  if (standbyVideo.getAttribute('src') !== url) { standbyVideo.src = url; standbyVideo.loop = true; standbyVideo.muted = true; standbyVideo.load(); }
+  if (standbyOn) standbyVideo.play().catch(() => {});
+}
+function standbyMusic(){
+  const url = String(design.musicUrl || '');
+  if (!standbyOn || !design.musicEnabled || !url) return;
+  if ((music.getAttribute('src') || '') !== url) { music.src = url; music.load(); }
+  music.loop = design.musicLoop !== false; music.volume = vol(design.musicVolume == null ? 20 : design.musicVolume);
+  if (music.paused) music.play().catch(() => {});
+}
+function showStandby(){
+  standbyOn = true; clearTimeout(standbyTimer); clearTimeout(introTimer);
+  audio.pause(); video.pause(); showSup(false); $('lower').classList.remove('on');
+  activeKind = 'none'; afterBreak = true; newsLayout = false;
+  renderPaused = false; standbyEl.classList.add('on');
+  if (standbyVideo.getAttribute('src')) standbyVideo.play().catch(() => {});
+  standbyMusic();
+  standbyTimer = setTimeout(() => { if (standbyOn) { renderPaused = true; setCam(0, true); } }, 800);
+}
+function hideStandby(){
+  if (!standbyOn) return;
+  standbyOn = false; clearTimeout(standbyTimer); renderPaused = false;
+  standbyEl.classList.remove('on');
+  standbyTimer = setTimeout(() => { if (!standbyOn) standbyVideo.pause(); }, 800);
+}
 async function showNews(p, my){
   clearTimeout(introTimer);
   const img = p.image || p.fallbackImage || '';
@@ -346,7 +378,7 @@ async function showNews(p, my){
   $('fCat').textContent = String(p.category || 'ACTUALIDAD').toUpperCase(); $('fDate').textContent = ecDate(p.pubDate || p.date || '');
   $('fExcl').classList.toggle('show', !!p.isExclusive && design.exclusiveEnabled !== false);
   const wasBreak = afterBreak; afterBreak = false;
-  activeKind = 'news'; hideCanned(); showSup(false);
+  activeKind = 'news'; hideStandby(); hideCanned(); showSup(false);
   setSupImage(src);
   // dirección: tras una pausa (inicio, enlatado o anuncio) abre en plano general; luego plano medio con la imagen
   const toNews = () => { if (my !== serial) return; newsLayout = true; setCam(1); shotDur = P.altSec; altT = 0; showSup(true, 'ots'); };
@@ -358,9 +390,23 @@ async function showNews(p, my){
   if (p.audioUrl) { audio.src = p.audioUrl; audio.currentTime = 0; audio.play().catch(e => playback('error', e.message || 'No se pudo iniciar el audio')); }
   else playback('ended');
 }
+// intervenciones de Merlín (presentación, pase, regreso, despedida): solo voz, sin imagen ni zócalos
+let hostSegment = '';
+function hostReport(type, message = ''){ try { window.ECAPI.presenterHostPlayback && window.ECAPI.presenterHostPlayback({type, segment:hostSegment, message}); } catch {} }
+async function showHost(p, my){
+  clearTimeout(introTimer); hostSegment = String(p.segment || '');
+  activeKind = 'host'; hideStandby(); hideCanned(); showSup(false); $('lower').classList.remove('on');
+  newsLayout = false;
+  if (hostSegment === 'pase' || hostSegment === 'despedida') setCam(2); else { setCam(0); afterBreak = false; }
+  ensureAudioGraph(); if (actx && actx.state === 'suspended') actx.resume().catch(() => {});
+  synthT = 0; silentFrames = 0; audio.volume = vol(design.voiceVolume == null ? 100 : design.voiceVolume);
+  if (my !== serial) return;
+  if (p.audioUrl) { audio.src = p.audioUrl; audio.currentTime = 0; audio.play().catch(e => hostReport('error', e.message || 'No se pudo iniciar el audio')); }
+  else hostReport('ended');
+}
 async function showCanned(p, my){
   clearTimeout(introTimer); audio.pause();
-  activeKind = 'canned'; afterBreak = true; showSup(false); $('lower').classList.remove('on');
+  activeKind = 'canned'; afterBreak = true; hideStandby(); showSup(false); $('lower').classList.remove('on');
   try { await (async () => { if (!music.paused) music.pause(); })(); } catch {}
   video.src = p.videoUrl || ''; video.volume = vol(design.cannedVolume == null ? 100 : design.cannedVolume); video.load();
   if (my !== serial) return;
@@ -368,8 +414,8 @@ async function showCanned(p, my){
   setTimeout(() => { if (activeKind === 'canned') renderPaused = true; }, 800);
   video.play().catch(e => playback('error', e.message || 'No se pudo reproducir el video'));
 }
-audio.addEventListener('ended', () => { if (activeKind === 'news') playback('ended'); });
-audio.addEventListener('error', () => { if (activeKind === 'news' && audio.src) playback('error', 'No se pudo cargar el audio'); });
+audio.addEventListener('ended', () => { if (activeKind === 'news') playback('ended'); else if (activeKind === 'host') hostReport('ended'); });
+audio.addEventListener('error', () => { if (!audio.src) return; if (activeKind === 'news') playback('error', 'No se pudo cargar el audio'); else if (activeKind === 'host') hostReport('error', 'No se pudo cargar el audio'); });
 video.addEventListener('ended', () => { if (activeKind === 'canned') playback('ended'); });
 video.addEventListener('error', () => { if (activeKind === 'canned' && video.getAttribute('src')) playback('error', 'No se pudo cargar el video'); });
 
@@ -379,13 +425,16 @@ if (api) {
   api.on('output:story', p => {
     p = p || {}; source = p.source || 'none'; if (p.design) applyDesign(p.design);
     const my = ++serial;
-    if ((p.kind || 'news') === 'canned') showCanned(p, my).catch(e => playback('error', e.message || String(e)));
+    if (p.kind === 'host') showHost(p, my).catch(e => hostReport('error', e.message || String(e)));
+    else if ((p.kind || 'news') === 'canned') showCanned(p, my).catch(e => playback('error', e.message || String(e)));
     else showNews(p, my).catch(e => playback('error', e.message || String(e)));
   });
   api.on('output:control', a => {
     if (a === 'play') { if (activeKind === 'canned') video.play().catch(() => {}); else { audio.play().catch(() => {}); startMusic().catch(() => {}); } }
     if (a === 'pause') { if (activeKind === 'canned') video.pause(); else audio.pause(); music.pause(); }
-    if (a === 'stop') { audio.pause(); try { audio.currentTime = 0; } catch {} video.pause(); music.pause(); clearTimeout(introTimer); showSup(false); hideCanned(); activeKind = 'none'; afterBreak = true; newsLayout = false; setCam(0); }
+    if (a === 'stop') { try { audio.currentTime = 0; } catch {} music.pause(); hideCanned(); showStandby(); }
+    if (a === 'play' && standbyOn) { standbyVideo.play().catch(() => {}); standbyMusic(); }
+    if (a === 'pause' && standbyOn) standbyVideo.pause();
   });
   (async () => { try { const s = await api.getSettings(); applyDesign((s && s.visual && s.visual.output) || {}); } catch { applyDesign({}); } })();
 } else log('ECAPI no disponible');
@@ -437,5 +486,6 @@ function tick(){
 }
 applyScene();
 requestAnimationFrame(tick);
+showStandby();
 window.__merlinOutput = { P, cams, setCam, showSup, state:() => ({activeKind, camIdx, supMode, supShown, newsLayout, tainted}) };
 })();

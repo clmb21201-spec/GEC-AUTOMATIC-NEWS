@@ -61,4 +61,7 @@ body{user-select:none}
 .canned.on{opacity:1}
 .canned video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
 
+.standby{position:absolute;inset:0;background:#000;opacity:0;transition:opacity .7s ease-in-out;pointer-events:none;z-index:4}
+.standby.on{opacity:1}
+.standby video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
 .grain{position:absolute;inset:0;pointer-events:none;mix-blend-mode:overlay;background-size:256px 256px;z-index:5}

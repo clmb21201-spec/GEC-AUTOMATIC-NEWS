@@ -284,6 +284,68 @@ function readPresenter(){try{const v=JSON.parse(fs.readFileSync(presenterFile(),
 function outputPageFile(){const d=currentDesign?.()||{};if(d.format==='9:16')return'output.html';return readPresenter().mode==='merlin'?'output-merlin.html':'output.html';}
 ipcMain.handle('presenter:get',()=>readPresenter());
 ipcMain.handle('presenter:set',async(_,mode)=>{const next={mode:mode==='merlin'?'merlin':'clasico'};try{fs.mkdirSync(path.dirname(presenterFile()),{recursive:true});fs.writeFileSync(presenterFile(),JSON.stringify(next,null,2),'utf8');}catch(e){logEvent('PRESENTER_SAVE',e.message||e);throw e;}
-  logEvent('PRESENTER_MODE',next.mode);let reopened=false;
+  logEvent('PRESENTER_MODE',next.mode);let reopened=false;if(next.mode==='merlin')setTimeout(()=>presenterHost.ensureClips().catch(()=>{}),1500);
   if(outputReady()){try{outputWindow.loadFile(path.join(__dirname,outputPageFile()));reopened=true;}catch(e){logEvent('PRESENTER_RELOAD',e.message||e);}}
   return{...next,reopened};});
+// ---- Presentador Merlín: intervenciones con frases fijas (presentación, pase a corte, regreso y despedida).
+// Solo actúa en modo Merlín y con la emisión automática; la salida clásica no recibe estas piezas (se omiten).
+const presenterHost=(()=>{
+  const crypto=require('crypto'),{pathToFileURL:toUrl}=require('url'),SEGS=['intro','pase','regreso','despedida'];
+  let phrases=null,durations={},generating=null,lastIdx={},started=false,lastKind='none',pending=null,pendingTimer=null,farewellPending=false,stopPatched=false,stopping=false,stopTimer=null,suppressStop=false;
+  function loadPhrases(){if(phrases)return phrases;try{const raw=JSON.parse(fs.readFileSync(path.join(__dirname,'assets','merlin','presenter-phrases.json'),'utf8'));phrases={};for(const k of SEGS)phrases[k]=(Array.isArray(raw[k])?raw[k]:[]).map(x=>String(x||'').trim()).filter(Boolean);}catch(e){logEvent('PRESENTER_PHRASES',e.message||e);phrases={intro:[],pase:[],regreso:[],despedida:[]};}return phrases;}
+  function cacheDir(){try{return path.join(dataDir||portableDataDir(),'presenter-voice');}catch{return path.join(app.getPath('userData'),'presenter-voice');}}
+  function voiceKey(){const s=settingsStore?.load?.()||{};return JSON.stringify({voice:s.tts?.voice||'',speed:s.tts?.speed||1,engine:s.tts?.engine||s.tts?.primaryEngine||''});}
+  function fileFor(text){return path.join(cacheDir(),crypto.createHash('sha1').update(voiceKey()+'|'+text).digest('hex').slice(0,16)+'.wav');}
+  const ready=f=>{try{return fs.statSync(f).size>1000;}catch{return false;}};
+  const active=()=>{try{return readPresenter().mode==='merlin'&&(currentDesign?.()||{}).format!=='9:16';}catch{return false;}};
+  async function ensureClips(){if(generating)return generating;if(!kokoro||!settingsStore)return;generating=(async()=>{const ph=loadPhrases();fs.mkdirSync(cacheDir(),{recursive:true});
+    for(const seg of SEGS)for(const text of ph[seg]){const f=fileFor(text);if(ready(f))continue;
+      try{const s=settingsStore.load(),a=await kokoro.generate(text,{voice:s.tts.voice,speed:s.tts.speed});if(a?.path&&fs.existsSync(a.path)){fs.copyFileSync(a.path,f);durations[f]=Number(a.durationSec)||0;try{kokoro.cleanupAudio?.(a.path);}catch{}}}
+      catch(e){logEvent('PRESENTER_TTS',`${seg}: ${e.message||e}`);}}
+  })().finally(()=>{generating=null;});return generating;}
+  function pick(seg){const list=(loadPhrases()[seg]||[]).map((text,i)=>({text,i,file:fileFor(text)})).filter(x=>ready(x.file));if(!list.length)return null;
+    let opts=list.filter(x=>x.i!==lastIdx[seg]);if(!opts.length)opts=list;const c=opts[Math.floor(Math.random()*opts.length)];lastIdx[seg]=c.i;return{...c,durationSec:durations[c.file]||0};}
+  function clearPending(){clearTimeout(pendingTimer);pendingTimer=null;const p=pending;pending=null;return p;}
+  function finish(reason){const p=clearPending();if(p?.after)try{p.after(reason);}catch(e){logEvent('PRESENTER_AFTER',e.message||e);}}
+  function playHost(seg,origDeliver,after){const clip=pick(seg);if(!clip){ensureClips().catch(()=>{});return false;}
+    const ok=origDeliver({kind:'host',segment:seg,title:'',summary:'',audioUrl:toUrl(clip.file).href,audioDurationSec:clip.durationSec,hostText:clip.text},'automatic',false);
+    if(!ok)return false;pending={after};pendingTimer=setTimeout(()=>finish('timeout'),Math.min(16000,Math.max(5000,((clip.durationSec||9)+4)*1000)));logEvent('PRESENTER_HOST',`${seg}: ${clip.text}`);return true;}
+  function notice(text){try{automation?.state?.({notice:text});}catch{}}
+  function farewell(origDeliver,origControl){stopping=false;clearTimeout(stopTimer);stopTimer=null;started=false;lastKind='none';
+    if(!playHost('despedida',origDeliver,()=>origControl('stop')))origControl('stop');}
+  // Detener emisión en modo Merlín: si hay una noticia al aire, termina de contarla, se despide y pasa al video de espera.
+  // Si hay un enlatado o anuncio (o una intervención en curso), se corta y se despide de inmediato.
+  function patchStop(origDeliver,origControl){if(stopPatched||!automation||typeof automation.stopEmission!=='function')return;stopPatched=true;
+    const origStop=automation.stopEmission.bind(automation),origStart=typeof automation.startEmission==='function'?automation.startEmission.bind(automation):null;
+    automation.stopEmission=function(...args){
+      if(!active()||!started||stopping)return origStop(...args);
+      const newsOnAir=automation.currentKind==='news'&&!pending;
+      if(newsOnAir){stopping=true;suppressStop=true;let r;try{r=origStop(...args);}finally{suppressStop=false;}
+        const prog=currentOutputProgram||{},left=Math.max(0,(Number(prog.durationSec)||0)-(Number(prog.currentSec)||0));
+        clearTimeout(stopTimer);stopTimer=setTimeout(()=>{if(stopping)farewell(origDeliver,origControl);},Math.min(5*60000,Math.max(20000,(left||120)*1000+10000)));
+        logEvent('PRESENTER_STOP','esperando el final de la noticia actual');setTimeout(()=>notice('Deteniendo: Merlín termina la noticia actual y se despide.'),50);return r;}
+      if(pending)clearPending();farewellPending=true;const r=origStop(...args);
+      if(farewellPending){farewellPending=false;farewell(origDeliver,origControl);}return r;};
+    if(origStart)automation.startEmission=function(...args){if(stopping){stopping=false;clearTimeout(stopTimer);stopTimer=null;logEvent('PRESENTER_STOP','cancelado: la emisión se reanudó');}return origStart(...args);};
+    ipcMain.on('output:playback',(_,ev)=>{if(stopping&&ev&&(ev.type==='ended'||ev.type==='error'))farewell(origDeliver,origControl);});}
+  function deliver(payload,source,autoOpen,origDeliver,origControl){
+    if(source!=='automatic'||!active()||payload?.kind==='host')return origDeliver(payload,source,autoOpen);
+    patchStop(origDeliver,origControl);if(pending)finish('superseded');
+    const kind=payload?.mediaRole==='ad'?'ad':(payload?.kind==='canned'?'canned':'news');
+    let seg=null;if(!started)seg='intro';else if((kind==='canned'||kind==='ad')&&lastKind==='news')seg='pase';else if(kind==='news'&&(lastKind==='canned'||lastKind==='ad'))seg='regreso';
+    started=true;lastKind=kind;
+    if(seg&&playHost(seg,origDeliver,()=>origDeliver(payload,source,autoOpen)))return true;
+    return origDeliver(payload,source,autoOpen);}
+  function control(action,origControl,origDeliver){const a=String(action||'');
+    if(a==='stop'&&suppressStop)return true;
+    if(a==='stop'&&farewellPending){farewellPending=false;if(pending)clearPending();farewell(origDeliver,origControl);return true;}
+    if(a==='stop'&&stopping){stopping=false;clearTimeout(stopTimer);stopTimer=null;started=false;lastKind='none';}
+    if(a==='stop'&&pending)clearPending();return origControl(action);}
+  ipcMain.on('presenter:hostPlayback',(_,ev)=>{if(ev&&(ev.type==='ended'||ev.type==='error'))finish(ev.type);});
+  // genera (una sola vez, con caché en disco) los audios de las frases cuando el modo Merlín está activo
+  app.whenReady().then(()=>{const t=setInterval(()=>{if(!kokoro||!settingsStore)return;clearInterval(t);if(active())setTimeout(()=>ensureClips().catch(()=>{}),20000);},2000);}).catch(()=>{});
+  return{deliver,control,ensureClips,state:()=>({started,lastKind,pending:!!pending})};
+})();
+{const __origDeliverToOutput=deliverToOutput,__origControlOutput=controlOutput;
+ deliverToOutput=function(payload,source,autoOpen=false){return presenterHost.deliver(payload,source,autoOpen,__origDeliverToOutput,__origControlOutput);};
+ controlOutput=function(action){return presenterHost.control(action,__origControlOutput,__origDeliverToOutput);};}

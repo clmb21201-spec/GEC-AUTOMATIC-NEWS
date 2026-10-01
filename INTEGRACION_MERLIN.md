@@ -57,6 +57,25 @@ Modificados:
 - Si WebGL o el modelo fallan al cargar, la ventana vuelve sola a `output.html`.
 - Si el análisis del audio queda bloqueado (silencio absoluto con el audio sonando), el pico usa un movimiento sintético para no quedarse quieto. Se registra en la consola como `[merlin] análisis de audio bloqueado`.
 
-## Pendiente (fase 2)
+## Video de espera
 
-Presentación y despedida: EC1 solo tiene `news`, `canned` y `ad`. Hace falta un tipo nuevo (`host` con `segment: 'intro' | 'outro'`), textos de la IA local, voz del TTS local y que el planificador los inserte al inicio y antes de cada bloque de enlatados o anuncios. La salida mostraría `intro` en plano general y `outro` en primer plano.
+Igual que la salida clásica (`output-0331.js`): al abrir la salida y después de `stop` se muestra el video de espera configurado en EC1 (`design.standbyVideoUrl`), con la música si está activada (`musicEnabled`, `musicUrl`). Se oculta en cuanto llega una pieza.
+
+## Intervenciones de Merlín
+
+Solo en modo Merlín y con la emisión automática; la salida clásica no las recibe. Merlín habla con frases fijas, sin imagen ni zócalos:
+
+| Momento | Segmento | Plano |
+|---|---|---|
+| Primera pieza de la emisión | `intro` | General |
+| Enlatado o anuncio que sigue a una noticia | `pase` | Primer plano |
+| Primera noticia después de un enlatado o anuncio | `regreso` | General; luego la noticia pasa directo a plano medio |
+| Al pulsar Detener emisión | `despedida` | Primer plano; luego `stop` y video de espera |
+
+**Detener emisión:** si hay una noticia al aire, no se corta: el motor deja de enviar piezas, la noticia termina, Merlín se despide y recién entonces se envía `stop`. El panel muestra "Deteniendo: Merlín termina la noticia actual y se despide." (tope de 5 minutos). Si hay un enlatado, un anuncio o una intervención en curso, se corta y se despide de inmediato. Si la emisión se reanuda antes de que termine la noticia, la despedida se cancela.
+
+**Frases:** están en `src/assets/merlin/presenter-phrases.json` y se pueden editar. Rotan al azar sin repetir la última.
+
+**Voz:** el audio de cada frase se genera una sola vez con `kokoro.generate` (la misma voz que las noticias) y se guarda en `data/presenter-voice/`, con un nombre que depende de la voz y del texto. Al cambiar un texto o la voz, se genera de nuevo. Se pregenera al activar el modo Merlín y al arrancar la app en ese modo. Si una frase todavía no tiene audio, esa intervención se salta.
+
+**Implementación:** `presenterHost` al final de `src/main.js` envuelve `deliverToOutput` y `controlOutput` y envía piezas `kind: 'host'` con `segment`. La salida avisa el fin de cada intervención con `ECAPI.presenterHostPlayback` (IPC `presenter:hostPlayback`), aparte de `outputPlayback`, así el motor de automatización no cambia. Si no llega el aviso, un temporizador sigue con la emisión.
