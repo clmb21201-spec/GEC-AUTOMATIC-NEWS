@@ -1,7 +1,7 @@
 'use strict';
-// Configuración del presentador Merlín.
-// Para usar tus ajustes: en la página "Merlín en el set", copia todo el texto de "Valores para Claude Code"
-// y reemplaza el objeto de abajo (desde la primera { hasta la última }), dejando el punto y coma final.
+// Configuración del presentador Merlín (exportada desde la página "Merlín en el set").
+// Para actualizarla: reemplaza el objeto de abajo por el texto de "Valores para Claude Code",
+// desde su primera { hasta su última }, sin dejar llaves de más. Debe quedar: window.MERLIN_CONFIG = { ... };
 window.MERLIN_CONFIG = {
   "modelo": "MERLIN1_CORREGIDO.glb (pesos del pico/ojos en CUERPO pasados a CABEZA)",
   "rotacion": "grados, relativos a la pose de reposo: bone.quaternion = rest * Euler(x,y,z, orden ZYX)",
