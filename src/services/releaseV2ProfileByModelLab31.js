@@ -6,6 +6,9 @@
 // Ahora cada perfil válido se archiva por modelo (tts-lab/production-profiles-by-model.json) y, al cargar la
 // configuración con otro modelo, se repone el perfil archivado de ese modelo si sigue siendo compatible
 // (misma computadora, runtime y modelo). La optimización de la voz ya se guardaba por modelo (Lab.29/Lab.31).
+// La voz de referencia (Qwen zero-shot, Chatterbox) no cuenta como otro modelo: es una entrada del mismo motor y
+// no cambia la VRAM ni la velocidad que decide la optimización. Antes invalidaba el perfil ("referencia Qwen
+// distinta" o la firma del runtime con reference=…) y había que reoptimizar solo por cambiar el clip.
 const fs=require('fs');
 const path=require('path');
 const {ipcMain}=require('electron');
@@ -24,7 +27,9 @@ function atomicJson(file,value){
 }
 function archiveFile(base){return path.join(base,'tts-lab',ARCHIVE_FILE);}
 function readArchive(base){const raw=readJson(archiveFile(base),{});return{schemaVersion:1,entries:raw&&raw.entries&&typeof raw.entries==='object'?raw.entries:{}};}
-function modelKey(settings){try{return lab.optimizationKey(settings?.tts||{});}catch{return'';}}
+function referenceFreeKey(key){const k=String(key||'');return k.startsWith('qwen3tts:reference:')?'qwen3tts:reference:base':k;}
+function referenceFreeSignature(sig){return String(sig||'').split('|').filter(x=>!/^reference=/.test(x)).join('|');}
+function modelKey(settings){try{return referenceFreeKey(lab.optimizationKey(settings?.tts||{}));}catch{return'';}}
 // misma regla que el perfil global (Lab.29): compatible con el modelo y de esta computadora
 function usable(settings,profile){
   if(!profile)return false;
@@ -47,9 +52,23 @@ function syncProfileForModel(base,settings){
   if(!entry?.profile||!usable(settings,entry.profile))return false;
   if(active&&JSON.stringify(active)===JSON.stringify(entry.profile))return false;
   // el perfil activo es de otro modelo: se archiva con su clave antes de reemplazarlo
-  if(active){const otherKey=String(active.tts?.optimizationKey||'');if(otherKey&&otherKey!==key&&!archive.entries[otherKey]){archive.entries[otherKey]={profile:clone(active),savedAt:new Date().toISOString()};atomicJson(archiveFile(base),archive);}}
+  if(active){const otherKey=referenceFreeKey(active.tts?.optimizationKey);if(otherKey&&otherKey!==key&&!archive.entries[otherKey]){archive.entries[otherKey]={profile:clone(active),savedAt:new Date().toISOString()};atomicJson(archiveFile(base),archive);}}
   atomicJson(file,clone(entry.profile));
   return true;
+}
+
+// compatibility sin la voz de referencia: la usan el perfil global (Lab.29), la estabilización y este archivo
+function installReferenceAgnosticCompatibility(){
+  if(fidelity.__gecLab31ReferenceAgnostic)return;Object.defineProperty(fidelity,'__gecLab31ReferenceAgnostic',{value:true});
+  const base=fidelity.compatibility;
+  fidelity.compatibility=function(settings={},profile=null){
+    const cmp=base(settings,profile);
+    if(cmp.ok||!profile)return cmp;
+    const tts=settings?.tts||{},p=clone(profile);
+    p.tts={...(p.tts||{}),referenceVoiceId:String(tts.referenceVoiceId||'')};
+    if(p.runtimeSignature){let sig='';try{sig=lab.ttsRuntimeSignature(tts);}catch{}if(sig&&referenceFreeSignature(sig)===referenceFreeSignature(p.runtimeSignature))p.runtimeSignature=sig;}
+    return base(settings,p);
+  };
 }
 
 function installLoadHook(){
@@ -75,6 +94,6 @@ function installClearHook(){
   });
 }
 
-function installReleaseV2ProfileByModelLab31(){installLoadHook();installClearHook();}
+function installReleaseV2ProfileByModelLab31(){installReferenceAgnosticCompatibility();installLoadHook();installClearHook();}
 
 module.exports={installReleaseV2ProfileByModelLab31,syncProfileForModel,archiveFile,ARCHIVE_FILE};

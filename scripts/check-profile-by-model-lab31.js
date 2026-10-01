@@ -17,22 +17,24 @@ const fidelity=require(path.join(src,'services','releaseV2ProductionFidelity'));
 require(path.join(src,'services','releaseV2Stabilization')).installReleaseV2Stabilization();
 const glob=require(path.join(src,'services','releaseV2GlobalOptimizationLab29'));glob.installMachineGlobalOptimizationLab29();
 require(path.join(src,'services','releaseV2FinalCorrectionsLab29')).installReleaseV2FinalCorrectionsLab29();
+require(path.join(src,'services','releaseV2QwenSpeedLab31')).installReleaseV2QwenSpeedLab31();
 const mod=require(path.join(src,'services','releaseV2ProfileByModelLab31'));mod.installReleaseV2ProfileByModelLab31();
 let checks=0;const ok=(v,m)=>{checks++;assert.ok(v,m);};
 
 (async()=>{
   const base=glob.dataRoot(),store=()=>new SettingsStore(base),pf=fidelity.profileFile(base);
   const active=()=>JSON.parse(fs.readFileSync(pf,'utf8'));
-  const setMode=(mode,model='')=>{const s=store().load();s.tts.engine='qwen3tts';s.tts.referenceVoiceId='v1';Object.assign(s.tts.engineParams.qwen3tts,{voiceMode:mode,fineTunedModelId:model});store().save(s);};
+  const setMode=(mode,model='',ref='v1')=>{const s=store().load();s.tts.engine='qwen3tts';s.tts.referenceVoiceId=ref;Object.assign(s.tts.engineParams.qwen3tts,{voiceMode:mode,fineTunedModelId:model});store().save(s);};
   const optimize=(label,layers)=>{const s=store().load();s.optimization0321={version:'2.0-lab.25',ttsEngine:'qwen3tts',fingerprint:'hw1',hardwareLabel:'RTX',at:new Date().toISOString(),voice:{medianRtf:1}};store().save(s);
     const p=fidelity.buildProfile(store().load(),{fingerprint:'hw1',hardwareLabel:'RTX',source:'optimizer',validated:true});p.pipeline={...(p.pipeline||{}),mode:'simultaneous',validated:true};p.localAi={...(p.localAi||{}),config:{...(p.localAi?.config||{}),gpuLayers:layers}};p.check=label;fs.mkdirSync(path.dirname(pf),{recursive:true});fs.writeFileSync(pf,JSON.stringify(p));};
 
   // 1) zero-shot optimizado: el perfil queda archivado con su modelo
   setMode('reference');optimize('zero-shot',48);
+  
   let st=await glob.status(base);
   ok(st.compatible===true,`el perfil de zero-shot debe valer: ${st.reason}`);
   let arch=JSON.parse(fs.readFileSync(mod.archiveFile(base),'utf8'));
-  ok(arch.entries['qwen3tts:reference:v1']?.profile?.check==='zero-shot','el perfil de zero-shot debe archivarse por modelo');
+  ok(arch.entries['qwen3tts:reference:base']?.profile?.check==='zero-shot','el perfil de zero-shot debe archivarse por modelo');
 
   // 2) fine-tuned sin optimizar: no hay perfil para él
   setMode('finetuned','m1');st=await glob.status(base);
@@ -40,7 +42,7 @@ let checks=0;const ok=(v,m)=>{checks++;assert.ok(v,m);};
   optimize('fine-tuned',99);st=await glob.status(base);
   ok(st.compatible===true,'el perfil del fine-tuned debe valer');
   arch=JSON.parse(fs.readFileSync(mod.archiveFile(base),'utf8'));
-  ok(arch.entries['qwen3tts:finetuned:m1']?.profile?.check==='fine-tuned'&&arch.entries['qwen3tts:reference:v1']?.profile?.check==='zero-shot','los dos perfiles quedan archivados');
+  ok(arch.entries['qwen3tts:finetuned:m1']?.profile?.check==='fine-tuned'&&arch.entries['qwen3tts:reference:base']?.profile?.check==='zero-shot','los dos perfiles quedan archivados');
 
   // 3) volver a zero-shot repone su perfil sin reoptimizar, y al revés
   setMode('reference');st=await glob.status(base);
@@ -48,6 +50,15 @@ let checks=0;const ok=(v,m)=>{checks++;assert.ok(v,m);};
   ok(Number(store().load().ai?.localTunedConfig?.gpuLayers||48)===48,'la configuración de la IA local sigue al perfil repuesto');
   setMode('finetuned','m1');st=await glob.status(base);
   ok(st.compatible===true&&active().check==='fine-tuned','al volver al fine-tuned se repone su perfil');
+
+  
+  // 3b) cambiar solo la voz de referencia no pide reoptimizar (perfil, insignia del panel y CUDA graphs de Lab.31)
+  setMode('reference','','v2');st=await glob.status(base);
+  ok(st.compatible===true&&active().check==='zero-shot',`otra voz de referencia conserva el perfil de zero-shot: ${st.reason}`);
+  {const s=store().load(),o=s.optimization0321||{};ok(o.ttsEngine==='qwen3tts'&&(!o.ttsOptimizationKey||o.ttsOptimizationKey==='qwen3tts:reference:v2'),'la optimización de la voz sigue valiendo con otra referencia (insignia OPTIMIZADA)');}
+  setMode('finetuned','m1');st=await glob.status(base);
+  ok(st.compatible===true&&active().check==='fine-tuned','después de cambiar la referencia, el fine-tuned conserva su perfil');
+  setMode('reference','','v1');
 
   // 4) otro fine-tuned u otra computadora no reciben un perfil archivado
   setMode('finetuned','m2');st=await glob.status(base);
