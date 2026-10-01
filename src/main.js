@@ -306,6 +306,16 @@ const presenterHost=(()=>{
       for(let i=0;i<n;i++){const v=d.readInt16LE(i*2)/32768;bs+=v*v;bc++;if(bc>=block){if(Math.sqrt(bs/bc)>.01){sum+=bs;cnt+=bc;}bs=0;bc=0;}}
       if(cnt){const target=Number(presenterCfg().volumen?.objetivoDb??-20),rmsDb=20*Math.log10(Math.sqrt(sum/cnt));g=Math.max(-12,Math.min(6,target-rmsDb));}}}catch(e){logEvent('PRESENTER_GAIN',e.message||e);}
     g=Math.round(g*10)/10;gains.set(file,g);if(gains.size>400)gains.delete(gains.keys().next().value);return g;}
+  // Lab.30: tramos con voz del WAV ([inicio,fin] en s) para que los subtítulos avancen con la voz y se anclen a las pausas.
+  const segCache=new Map();
+  function speechSegmentsFor(file){if(!file)return null;if(segCache.has(file))return segCache.get(file);let segs=null;try{const w=readWav(file);if(w&&w.fmt.bits===16&&w.fmt.rate>0){
+      const d=w.data,ch=Math.max(1,w.fmt.channels),n=Math.floor(d.length/2),frame=Math.max(1,Math.round(w.fmt.rate*.02))*ch,secPerFrame=frame/ch/w.fmt.rate,dbs=[];
+      for(let i=0;i<n;i+=frame){let sum=0,c=0;for(let j=i;j<Math.min(n,i+frame);j++){const v=d.readInt16LE(j*2)/32768;sum+=v*v;c++;}dbs.push(c?10*Math.log10(Math.max(sum/c,1e-12)):-120);}
+      const sorted=[...dbs].sort((a,b)=>a-b),level=sorted[Math.floor(sorted.length*.9)]??-30,thr=Math.max(-55,Math.min(-30,level-30));
+      const raw=[];let st=-1;dbs.forEach((db,i)=>{if(db>thr){if(st<0)st=i;}else if(st>=0){raw.push([st,i]);st=-1;}});if(st>=0)raw.push([st,dbs.length]);
+      const merged=[];for(const r of raw){const last=merged[merged.length-1];if(last&&(r[0]-last[1])*secPerFrame<.12)last[1]=r[1];else merged.push([...r]);}
+      segs=merged.filter(r=>(r[1]-r[0])*secPerFrame>=.06).slice(0,2000).map(r=>[Math.round(r[0]*secPerFrame*100)/100,Math.round(r[1]*secPerFrame*100)/100]);}}catch(e){logEvent('PRESENTER_SUBS',e.message||e);}
+    segCache.set(file,segs);if(segCache.size>200)segCache.delete(segCache.keys().next().value);return segs;}
   const fileOf=url=>{try{return String(url||'').startsWith('file:')?fileURLToPath(url):'';}catch{return '';}};
   function concatWavs(files,out){const ws=files.map(readWav);if(ws.some(w=>!w))throw new Error('audio no es WAV PCM');const f=ws[0].fmt;
     if(ws.some(w=>w.fmt.rate!==f.rate||w.fmt.channels!==f.channels||w.fmt.bits!==f.bits))throw new Error('formatos de WAV distintos');
@@ -337,7 +347,7 @@ const presenterHost=(()=>{
   function clearPending(){clearTimeout(pendingTimer);pendingTimer=null;const p=pending;pending=null;return p;}
   function finish(reason){const p=clearPending();if(p?.after)try{p.after(reason);}catch(e){logEvent('PRESENTER_AFTER',e.message||e);}}
   function playHost(seg,origDeliver,after){const clip=pick(seg);if(!clip){ensureClips().catch(()=>{});return false;}
-    const ok=origDeliver({kind:'host',segment:seg,title:'',summary:'',audioUrl:toUrl(clip.file).href,audioDurationSec:clip.durationSec,hostText:clip.text,audioGainDb:gainDbFor(clip.file)},'automatic',false);
+    const ok=origDeliver({kind:'host',segment:seg,title:'',summary:'',audioUrl:toUrl(clip.file).href,audioDurationSec:clip.durationSec,hostText:clip.text,speechSegments:speechSegmentsFor(clip.file),audioGainDb:gainDbFor(clip.file)},'automatic',false);
     if(!ok)return false;pending={after};pendingTimer=setTimeout(()=>finish('timeout'),Math.min(16000,Math.max(5000,((clip.durationSec||9)+4)*1000)));logEvent('PRESENTER_HOST',`${seg}: ${clip.text}`);return true;}
   function notice(text){try{automation?.state?.({notice:text});}catch{}}
   function farewell(origDeliver,origControl){stopping=false;clearTimeout(stopTimer);stopTimer=null;started=false;lastKind='none';
@@ -362,6 +372,7 @@ const presenterHost=(()=>{
     patchStop(origDeliver,origControl);if(pending)finish('superseded');
     const kind=payload?.mediaRole==='ad'?'ad':(payload?.kind==='canned'?'canned':'news');
     if(kind==='news'&&payload?.audioUrl&&payload.audioGainDb==null)payload={...payload,audioGainDb:gainDbFor(fileOf(payload.audioUrl))};
+    if(kind==='news'&&payload?.audioUrl&&!payload.speechSegments)payload={...payload,speechSegments:speechSegmentsFor(fileOf(payload.audioUrl))};
     let seg=null;if(!started)seg='intro';else if((kind==='canned'||kind==='ad')&&lastKind==='news')seg='pase';else if(kind==='news'&&(lastKind==='canned'||lastKind==='ad'))seg='regreso';
     if(!started)lastTit=Date.now();started=true;lastKind=kind;
     // titulares: se preparan ~90 s antes de tocar y salen antes de una noticia (nunca junto con otra intervención)
@@ -369,7 +380,7 @@ const presenterHost=(()=>{
     if(every&&kind==='news'){const since=Date.now()-lastTit;
       if(since>=every-90000&&!titReady&&!titPrep)prepareTitulares();
       if(!seg&&since>=every&&titReady&&Date.now()-titReady.at<10*60000){const t=titReady;titReady=null;lastTit=Date.now();
-        const ok=origDeliver({kind:'host',segment:'titulares',title:'',summary:'',audioUrl:toUrl(t.file).href,audioDurationSec:t.durationSec,hostText:t.text,headlines:t.items,headlinesIntroSec:t.introSec,headlineMarks:t.marks,audioGainDb:gainDbFor(t.file)},'automatic',false);
+        const ok=origDeliver({kind:'host',segment:'titulares',title:'',summary:'',audioUrl:toUrl(t.file).href,audioDurationSec:t.durationSec,speechSegments:speechSegmentsFor(t.file),hostText:t.text,headlines:t.items,headlinesIntroSec:t.introSec,headlineMarks:t.marks,audioGainDb:gainDbFor(t.file)},'automatic',false);
         if(ok){pending={after:()=>origDeliver(payload,source,autoOpen)};pendingTimer=setTimeout(()=>finish('timeout'),Math.min(60000,(t.durationSec+5)*1000));logEvent('PRESENTER_HOST',`titulares: ${t.items.length}`);return true;}}}
     if(seg&&playHost(seg,origDeliver,()=>origDeliver(payload,source,autoOpen)))return true;
     return origDeliver(payload,source,autoOpen);}

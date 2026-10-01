@@ -63,5 +63,50 @@ let checks=0;const ok=(v,m)=>{checks++;assert.ok(v,m);};
   ok(fin.includes("path.join(process.resourcesPath,'runtime','tts-lab','chatterbox_pause_cleanup_lab29.py')")&&fin.includes('.asar'),'la limpieza debe usar la copia fuera de app.asar');
   ok(read('services/releaseV2GpuIsolationLab30.js').includes('chatterbox-cleanup.log'),'la limpieza debe quedar registrada');
 
+  // 7) subtítulos: mismo texto que la voz (titular + guion) y anclados a las pausas reales del audio
+  {
+    const out=read('output-merlin.js');
+    const a=out.indexOf('let subsChunks = []'),b=out.indexOf('function updateSubs(){');
+    ok(a>0&&b>a,'no se encontró la lógica de subtítulos');
+    const audio={currentTime:0,duration:12};
+    const sctx={audio,Math,String,Array,Infinity,console};vm.createContext(sctx);
+    vm.runInContext(out.slice(a,b)+';this.api={buildSubs,locutionText,subsPos,get chunks(){return subsChunks;},get map(){return subsMap;}};',sctx);
+    const S=sctx.api;
+    ok(S.locutionText('Sismo en Lima','El movimiento fue leve.')==='Sismo en Lima. El movimiento fue leve.','el subtítulo debe empezar con el titular, como la voz');
+    ok(S.locutionText('Sismo en Lima','Sismo en Lima: el movimiento fue leve.')==='Sismo en Lima: el movimiento fue leve.','no debe repetir el titular si el guion ya empieza con él');
+    const text=S.locutionText('Titular corto','Primera oración bastante más larga que el titular. Segunda oración.');
+    // voz: titular 0-1,5 s · pausa · oración 1 2,0-8,0 s · pausa · oración 2 8,6-10,5 s
+    S.buildSubs(text,[[0,1.5],[2.0,5.0],[5.08,8.0],[8.6,10.5]],'Titular corto. Primera oración bastante más larga que el titular. Segunda oración.');
+    ok(S.map&&S.map.bounds.length===4,'debe anclar 3 oraciones');
+    const sent=i=>{const ch=S.chunks;const pos=S.subsPos();const c=ch.find(x=>pos<x.start+x.weight)||ch[ch.length-1];return c.sentence;};
+    audio.currentTime=1.0;ok(sent()===0,'durante el titular debe mostrarse el titular');
+    audio.currentTime=1.9;ok(sent()===0,'en la pausa tras el titular no debe adelantarse');
+    audio.currentTime=3.0;ok(sent()===1,'al hablar la primera oración debe mostrarse la primera oración');
+    audio.currentTime=8.4;ok(sent()===1,'en la pausa tras la primera oración no debe adelantarse');
+    audio.currentTime=9.0;ok(sent()===2,'la segunda oración debe empezar al volver la voz');
+    S.buildSubs(text,null,'');audio.currentTime=6;ok(S.map===null&&S.subsPos()>0,'sin tramos debe usar el reparto proporcional');
+  }
+  {
+    // detección de tramos con voz en main.js (presenterHost) con un WAV sintético
+    const os=require('os'),crypto=require('crypto'),{pathToFileURL}=require('url');
+    const main=read('main.js'),code=main.slice(main.indexOf('// ---- Presentador Merlín: intervenciones'),main.indexOf('// ---- Merlín: volumen normalizado'));
+    const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'gec-subs-'));
+    // [duración s, amplitud]: voz 0,5 · silencio 0,6 · voz 1,2 · silencio 0,3 · voz 0,8
+    const rate=16000,parts=[[0.5,0.4],[0.6,0],[1.2,0.4],[0.3,0],[0.8,0.4]];
+    const samples=[];for(const [dur,amp] of parts)for(let i=0;i<Math.round(dur*rate);i++)samples.push(Math.round(amp*0.5*32767*Math.sin(2*Math.PI*220*i/rate)));
+    const b=Buffer.alloc(44+samples.length*2);b.write('RIFF',0,'ascii');b.writeUInt32LE(36+samples.length*2,4);b.write('WAVE',8,'ascii');b.write('fmt ',12,'ascii');b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(1,22);b.writeUInt32LE(rate,24);b.writeUInt32LE(rate*2,28);b.writeUInt16LE(2,32);b.writeUInt16LE(16,34);b.write('data',36,'ascii');b.writeUInt32LE(samples.length*2,40);samples.forEach((v,i)=>b.writeInt16LE(v,44+i*2));
+    const wav=path.join(tmp,'nota.wav');fs.writeFileSync(wav,b);
+    const sent=[];const pctx={require,console,setTimeout,clearTimeout,setInterval,clearInterval,Math,JSON,String,Number,Array,Date,Buffer,fs,path,__dirname:src,dataDir:tmp,portableDataDir:()=>tmp,
+      app:{whenReady:()=>new Promise(()=>{}),getPath:()=>tmp},settingsStore:{load:()=>({tts:{voice:'v',speed:1}})},kokoro:null,pronunciation:null,automation:{currentKind:'none',queue:[],stopEmission(){},state(){}},ipcMain:{on(){}},logEvent:()=>{},
+      readPresenter:()=>({mode:'merlin'}),currentDesign:()=>({format:'16:9'}),currentOutputProgram:{},deliverToOutput:p=>{sent.push(p);return true;},controlOutput:()=>{}};
+    vm.createContext(pctx);vm.runInContext(code,pctx);
+    // ya se emitió la presentación (sin clips listos se salta): la noticia debe llegar con sus tramos
+    pctx.deliverToOutput({kind:'news',audioUrl:pathToFileURL(wav).href},'automatic',false);
+    const news=sent.find(p=>p.kind==='news');
+    ok(news&&Array.isArray(news.speechSegments)&&news.speechSegments.length===3,'la noticia debe llegar con 3 tramos de voz: '+JSON.stringify(news&&news.speechSegments));
+    const exp=[[0,0.5],[1.1,2.3],[2.6,3.4]];ok(news.speechSegments.every((x,i)=>Math.abs(x[0]-exp[i][0])<0.05&&Math.abs(x[1]-exp[i][1])<0.05),'tramos mal medidos: '+JSON.stringify(news.speechSegments));
+    fs.rmSync(tmp,{recursive:true,force:true});
+  }
+
   console.log(`check-merlin-lab30 OK · ${checks} verificaciones`);
 })().catch(e=>{console.error(e);process.exit(1);});

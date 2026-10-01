@@ -407,25 +407,67 @@ function updateClock(){
 }
 setInterval(updateClock, 1000);
 
-// ---------------------------------------------------------------- subtítulos (texto exacto del guion, tiempos estimados)
-let subsChunks = [], subsKey = '';
-function buildSubs(text){
-  const clean = String(text || '').replace(/\s+/g, ' ').trim(); subsChunks = []; subsKey = '';
-  if (!clean) return;
-  const sentences = clean.split(/(?<=[.!?;:])\s+/);
-  for (const sen of sentences) {
+// ---------------------------------------------------------------- subtítulos (texto exacto de la locución)
+// Lab.30: el texto es el mismo que lee la voz (titular + guion, igual que locutionSource en la automatización) y avanza
+// con la voz real: main manda los tramos con voz del WAV (p.speechSegments); cada oración se ancla a su pausa y dentro
+// de la oración el texto solo avanza mientras Merlín habla, con pesos del texto hablado (p.ttsScript: cifras en letras).
+// Sin tramos se usa el reparto proporcional a la duración (comportamiento anterior).
+let subsChunks = [], subsKey = '', subsMap = null;
+const subsSentences = t => String(t || '').replace(/\s+/g, ' ').trim().split(/(?<=[.!?;:])\s+/).filter(Boolean);
+function locutionText(title, script){
+  const t = String(title || '').trim(), s = String(script || '').trim(); if (!t) return s; if (!s) return t;
+  const clean = x => x.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  const ct = clean(t), cs = clean(s.slice(0, Math.max(t.length * 2, 220)));
+  return ct && cs.startsWith(ct) ? s : `${t}. ${s}`;
+}
+function buildSubs(text, segs, spoken){
+  subsChunks = []; subsKey = ''; subsMap = null;
+  const sentences = subsSentences(text); if (!sentences.length) return;
+  const sentW = [];
+  sentences.forEach((sen, si) => {
     const words = sen.split(' '); let cur = [];
-    for (const w of words) { cur.push(w); if (cur.join(' ').length >= 58 || cur.length >= 11) { subsChunks.push(cur); cur = []; } }
-    if (cur.length) { if (cur.length <= 2 && subsChunks.length && subsChunks[subsChunks.length-1].length < 13) subsChunks[subsChunks.length-1].push(...cur); else subsChunks.push(cur); }
-  }
-  let acc = 0; subsChunks = subsChunks.map(words => { const weight = words.join(' ').length + 6; const c = {words, start:acc, weight}; acc += weight; return c; });
+    const push = c => subsChunks.push({words: c, sentence: si});
+    for (const w of words) { cur.push(w); if (cur.join(' ').length >= 58 || cur.length >= 11) { push(cur); cur = []; } }
+    if (cur.length) { const last = subsChunks[subsChunks.length - 1]; if (cur.length <= 2 && last && last.sentence === si && last.words.length < 13) last.words.push(...cur); else push(cur); }
+  });
+  let acc = 0; subsChunks = subsChunks.map(c => { const weight = c.words.join(' ').length + 6; const x = {...c, start: acc, weight}; acc += weight; return x; });
   subsChunks.total = acc;
+  sentences.forEach((_, si) => { const cs = subsChunks.filter(c => c.sentence === si); sentW.push({c0: cs[0].start, c1: cs[cs.length - 1].start + cs[cs.length - 1].weight}); });
+  const spokenSent = subsSentences(spoken), timeW = spokenSent.length === sentences.length ? spokenSent.map(x => x.length + 6) : sentW.map(x => x.c1 - x.c0);
+  subsMap = alignSubs(Array.isArray(segs) ? segs : null, timeW, sentW);
+}
+function alignSubs(segs, w, sentW){
+  const seg = (segs || []).filter(x => Array.isArray(x) && x[1] > x[0]).sort((a, b) => a[0] - b[0]);
+  if (!seg.length) return null;
+  const vStart = []; let T = 0; for (const x of seg) { vStart.push(T); T += x[1] - x[0]; }
+  if (T <= 0) return null;
+  const gaps = []; for (let i = 0; i + 1 < seg.length; i++) gaps.push({v: vStart[i] + seg[i][1] - seg[i][0], dur: seg[i + 1][0] - seg[i][1], idx: i});
+  const W = w.reduce((a, b) => a + b, 0) || 1, len = w.map(x => T * x / W), bounds = [0];
+  let expected = 0, lastGap = -1;
+  for (let k = 1; k < w.length; k++) {
+    expected += len[k - 1];
+    const tol = 0.45 * Math.min(len[k - 1], len[k]);
+    let best = null, bestScore = Infinity;
+    for (const g of gaps) { if (g.idx <= lastGap || g.dur < 0.18 || Math.abs(g.v - expected) > tol) continue; const sc = Math.abs(g.v - expected) - 0.15 * g.dur; if (sc < bestScore) { bestScore = sc; best = g; } }
+    if (best) { lastGap = best.idx; bounds.push(best.v); } else bounds.push(Math.max(bounds[bounds.length - 1], expected));
+  }
+  bounds.push(T);
+  const voicedAt = t => { let v = 0; for (let i = 0; i < seg.length; i++) { const [a, b] = seg[i]; if (t <= a) break; v += Math.min(t, b) - a; } return v; };
+  return {T, bounds, sentW, voicedAt};
+}
+function subsPos(){
+  if (!subsMap) return Math.min(1, audio.currentTime / audio.duration) * subsChunks.total;
+  const m = subsMap, v = m.voicedAt(audio.currentTime);
+  // en la pausa (v justo en el límite) queda la oración terminada; la siguiente aparece cuando vuelve la voz
+  let k = m.sentW.length - 1; for (let i = 0; i < m.sentW.length; i++) { if (v <= m.bounds[i + 1]) { k = i; break; } }
+  const span = Math.max(1e-6, m.bounds[k + 1] - m.bounds[k]), frac = Math.max(0, Math.min(1, (v - m.bounds[k]) / span));
+  return m.sentW[k].c0 + frac * (m.sentW[k].c1 - m.sentW[k].c0 - 1e-6);
 }
 function updateSubs(){
   const el = $('subs');
   const live = P.subsOn && subsChunks.length && (activeKind === 'news' || activeKind === 'host') && !audio.paused && !audio.ended && audio.duration > 0;
   if (!live) { el.classList.remove('on'); return; }
-  const pos = Math.min(1, audio.currentTime / audio.duration) * subsChunks.total;
+  const pos = subsPos();
   let c = subsChunks[subsChunks.length - 1]; for (const x of subsChunks) { if (pos < x.start + x.weight) { c = x; break; } }
   const inner = Math.max(0, Math.min(1, (pos - c.start) / c.weight)), n = c.words.length, said = Math.min(n, Math.floor(inner * (n + 1)));
   const key = subsChunks.indexOf(c) + ':' + said;
@@ -506,7 +548,7 @@ async function showNews(p, my){
   // textos generados por la IA local de EC1
   const lowerWasOn = $('lower').classList.contains('on') && activeKind === 'news';
   setLower(p.title, p.category || 'ACTUALIDAD', !!p.isExclusive);
-  buildSubs(p.script || p.summary || ''); setTone(p.tone); hlIdx = -1;
+  buildSubs(locutionText(p.title, p.script || p.summary || ''), p.speechSegments, p.ttsScript); setTone(p.tone); hlIdx = -1;
   $('fTitle').textContent = p.title || ''; $('fSummary').textContent = p.summary || '';
   $('fCat').textContent = String(p.category || 'ACTUALIDAD').toUpperCase(); $('fDate').textContent = ecDate(p.pubDate || p.date || '');
   $('fExcl').classList.toggle('show', !!p.isExclusive && design.exclusiveEnabled !== false);
@@ -533,7 +575,7 @@ let hostSegment = '';
 function hostReport(type, message = ''){ try { window.ECAPI.presenterHostPlayback && window.ECAPI.presenterHostPlayback({type, segment:hostSegment, message}); } catch {} }
 async function showHost(p, my){
   clearTimeout(introTimer); hostSegment = String(p.segment || '');
-  buildSubs(p.hostText || ''); setTone(hostSegment === 'despedida' ? 'neutral' : 'ligero');
+  buildSubs(p.hostText || '', p.speechSegments, ''); setTone(hostSegment === 'despedida' ? 'neutral' : 'ligero');
   headlines = Array.isArray(p.headlines) ? p.headlines.slice(0, 6) : []; hlIdx = -1; hlIntroSec = Number(p.headlinesIntroSec) || 4; if (Array.isArray(p.headlineMarks)) headlines.marks = p.headlineMarks.map(Number);
   { const w = coverWaitMs(); if (w) { await sleep(w); if (my !== serial) return; } }
   newsLayout = false;
