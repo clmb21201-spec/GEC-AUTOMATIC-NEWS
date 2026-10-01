@@ -1,7 +1,7 @@
 'use strict';
-// Configuración del presentador Merlín (exportada desde la página "Merlín en el set").
-// Para actualizarla: reemplaza el objeto de abajo por el texto de "Valores para Claude Code",
-// desde su primera { hasta su última }, sin dejar llaves de más. Debe quedar: window.MERLIN_CONFIG = { ... };
+// Configuración del presentador Merlín (exportada desde la página "Merlín en el set" y ampliada).
+// Si vuelves a pegar el texto de "Valores para Claude Code", conserva las secciones subtitulos, reloj, titulares, volumen y expresion.
+// Debe quedar: window.MERLIN_CONFIG = { ... };
 window.MERLIN_CONFIG = {
   "modelo": "MERLIN1_CORREGIDO.glb (pesos del pico/ojos en CUERPO pasados a CABEZA)",
   "rotacion": "grados, relativos a la pose de reposo: bone.quaternion = rest * Euler(x,y,z, orden ZYX)",
@@ -156,7 +156,8 @@ window.MERLIN_CONFIG = {
     "nota": "EC1 debe enviar con cada audio el tipo de segmento: intro | news | return | outro, más la imagen y el titular en las noticias",
     "transicion": "smooth",
     "acercamientoLento": "+4% durante el plano",
-    "metodo": "CSS transform (translate+scale) en las capas de atrás y de adelante; el 3D usa camera.setViewOffset con el mismo recorte"
+    "metodo": "CSS transform (translate+scale) en las capas de atrás y de adelante; el 3D usa camera.setViewOffset con el mismo recorte",
+    "planoMedioCentradoAuto": true
   },
   "imagenApoyo": {
     "cuadroPared": {
@@ -333,6 +334,29 @@ window.MERLIN_CONFIG = {
       "x": 0,
       "y": 0,
       "z": 0
+    }
+  },
+  "subtitulos": {
+    "activos": true,
+    "nota": "texto exacto del guion (p.script); tiempos estimados por largo de frase"
+  },
+  "reloj": {
+    "activo": true,
+    "posicion": "derecha"
+  },
+  "titulares": {
+    "cadaMinutos": 25,
+    "cantidad": 3
+  },
+  "volumen": {
+    "objetivoDb": -20,
+    "nota": "nivel RMS de la voz (tramos con voz) al que se normaliza; ganancia limitada a -12..+6 dB"
+  },
+  "expresion": {
+    "cejas": {
+      "eje": "x",
+      "amplitud": 12,
+      "nota": "solo si el modelo trae los huesos CEJA_L y CEJA_R"
     }
   }
 };

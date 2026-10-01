@@ -26,7 +26,9 @@ const P = {
   headTalk:num('cabeza.acompanaAlHablar',0), wingDrop:num('alas.bajar.ALA_SUP_L.grados',60), wingTalk:num('alas.alHablar.intensidad',0.6),
   blink:get('vida.parpadeo',true), gazeOn:get('vida.miradas',true), headOn:get('vida.balanceoCabeza',true), breath:get('vida.respiracion',true), wingsFix:get('vida.alasIndependientes',true),
   // cámaras y dirección
-  medX:num('camaras.planoMedioMerlinX',0.3), altSec:num('camaras.alternanciaSeg',12), trans:get('camaras.transicion','cut'), kenBurns:get('camaras.acercamientoLento',true) !== false, introSec:num('camaras.generalAlVolverSeg',4),
+  // cambio de plano con la transición elegida ('smooth' = movimiento suave, 'cut' = corte); dentro del plano, acercamiento lento si está activo.
+  // Con la pantalla cubierta, el cambio es instantáneo. Si el plano no cambia, la cámara no se reescala.
+  medX:num('camaras.planoMedioMerlinX',0.3), altSec:num('camaras.alternanciaSeg',12), trans:String(get('camaras.transicion','smooth')), kenBurns:get('camaras.acercamientoLento',true) !== false, introSec:num('camaras.generalAlVolverSeg',4),
   // imagen de apoyo
   supFrame:get('imagenApoyo.cuadroPared.activo',true), supTab:get('imagenApoyo.tablet.activo',true), supAlt:get('imagenApoyo.alternarEnNoticias',true),
   otsSide:get('imagenApoyo.recuadro.lado','auto'), otsW:num('imagenApoyo.recuadro.anchoMax',0.4), otsX:num('imagenApoyo.recuadro.desplazX',0), otsY:num('imagenApoyo.recuadro.top',0.06),
@@ -34,12 +36,16 @@ const P = {
   envPhoto:get('integracion.entornoDesdeFoto',true), bounce:num('integracion.reboteMesa.intensidad',0.45), occ:num('integracion.sombraMesa.intensidad',0.35), deskLine:num('integracion.sombraMesa.lineaMesaPantallaY',0.63),
   feather:num('integracion.plumas.intensidad',0.35), whiteTone:num('integracion.blancoCalido',0.05), filter:String(get('integracion.filtroCSS','sepia(0.04) saturate(0.95) contrast(0.97) blur(0.4px)')), grainA:num('integracion.grano',0.16),
   // luz
+  clockOn:get('reloj.activo',true) !== false, clockPos:String(get('reloj.posicion','derecha')),
+  subsOn:get('subtitulos.activos',true) !== false, medAuto:get('camaras.planoMedioCentradoAuto',true) !== false,
+  browAxis:String(get('expresion.cejas.eje','x')), browAmp:num('expresion.cejas.amplitud',12),
   exposure:num('iluminacion.exposicion',0.8), keyI:num('iluminacion.luzPrincipal',1), envI:num('iluminacion.reflejosEntorno',0.5), metal:num('iluminacion.metalizado',0)
 };
 const planes = get('camaras.planos', null);
 let cams = Array.isArray(planes) && planes.length === 3 ? planes.map(p => ({z:Number(p.zoom)||1, dx:Number(p.desplazX)||0, dy:Number(p.desplazY)||0}))
   : [{z:1,dx:0,dy:0},{z:1.75,dx:-0.03,dy:-0.02},{z:2.3,dx:-0.02,dy:-0.05}];
-const BONES = ['BOCA_INF','BOCA_SUP','PARPADOS_MAYA','OJO_R','OJO_L','CABEZA','COLUMNA','ALA_SUP_R','ALA_SUP_L'];
+// CEJA_L / CEJA_R son opcionales: si el modelo los trae (agregados en Blender), se usan para la expresión; si no, se ignoran.
+const BONES = ['BOCA_INF','BOCA_SUP','PARPADOS_MAYA','OJO_R','OJO_L','CABEZA','COLUMNA','ALA_SUP_R','ALA_SUP_L','CEJA_L','CEJA_R'];
 const manual = {}; for (const n of BONES) manual[n] = Object.assign({x:0,y:0,z:0}, get('ajusteManual.'+n, {}));
 
 // ---------------------------------------------------------------- escenario 1920x1080 escalado (igual que fitStage de output.js)
@@ -192,15 +198,26 @@ function headScreen(){
   rig.updateMatrixWorld(true); b.getWorldPosition(headV); camera.clearViewOffset(); headV.project(camera);
   return {x:(headV.x+1)/2, y:(1-headV.y)/2};
 }
+// posición en pantalla de la cabeza en plano medio con imagen: centrada en el espacio libre que deja el recuadro
+function medTarget(){
+  if (!P.medAuto) return P.medX;
+  const edge = Math.min(0.96, Math.max(0.3, 0.5 + P.otsX));
+  return P.otsSide === 'left' ? (edge + 1) / 2 : edge / 2;
+}
 function camGoal(i){
   const c = cams[i]; let cx = 0.5 + c.dx, cy = 0.5 + c.dy;
-  if (i > 0) { const h = headScreen(); cx = h.x + c.dx; cy = h.y + c.dy; if (i === 1 && newsLayout) cx = h.x + (0.5 - P.medX) / c.z; }
+  if (i > 0) { const h = headScreen(); cx = h.x + c.dx; cy = h.y + c.dy; if (i === 1 && newsLayout) cx = h.x + (0.5 - medTarget()) / c.z; }
   const half = 0.5 / c.z;
   return { z:c.z, cx:Math.min(1-half, Math.max(half, cx)), cy:Math.min(1-half, Math.max(half, cy)) };
 }
 function setCam(i, instant){
-  camIdx = i; camTarget = camGoal(i); kb = 0;
-  if (instant || P.trans === 'cut') camNow = {...camTarget};
+  const goal = camGoal(i);
+  // mismo plano y mismo encuadre (p. ej. presentación o regreso en general → noticia que abre en general): no se toca nada,
+  // así el acercamiento lento sigue su curso sin reescalarse
+  if (i === camIdx && Math.abs(goal.z - camTarget.z) < 1e-3 && Math.abs(goal.cx - camTarget.cx) < 2e-3 && Math.abs(goal.cy - camTarget.cy) < 2e-3) return;
+  camIdx = i; camTarget = goal;
+  if (instant || P.trans === 'cut') { camNow = {...goal}; kb = 0; }
+  else { camNow.z *= (1 + 0.04 * kb); kb = 0; } // el movimiento suave arranca desde el encuadre que se ve (incluido el acercamiento), sin saltos
 }
 function updateCamera(dt){
   if (P.kenBurns) kb = Math.min(1, kb + dt / Math.max(4, shotDur));
@@ -229,9 +246,24 @@ function quadMatrix(w, h, dst){
 }
 function layoutPlanes(){ for (const id in QUADS){ const q = QUADS[id], el = $(id); el.style.width = q.w+'px'; el.style.height = q.h+'px'; el.style.transform = quadMatrix(q.w, q.h, q.pts.map(([x,y]) => [x*W, y*H])); } }
 let supSrc = '', supShown = false, supMode = 'ots';
-function setSupImage(src){
+// mismo criterio que applyMotion() de output.js: modo según Diseño (auto | zoom | vertical | horizontal | none) y velocidad (slow | normal | fast)
+function applyMotion(img){
+  if (!img) return;
+  let mode = design.animation || 'auto';
+  if (mode === 'auto') { const ar = (img.naturalWidth || 16) / (img.naturalHeight || 9); mode = ar < 1 ? 'vertical' : ar > 1.9 ? 'horizontal' : 'zoom'; }
+  img.classList.remove('motion-vertical','motion-horizontal','motion-zoom','motion-none'); void img.offsetWidth;
+  img.classList.add({vertical:'motion-vertical', horizontal:'motion-horizontal', zoom:'motion-zoom', none:'motion-none'}[mode] || 'motion-zoom');
+  stageEl.style.setProperty('--motion-duration', ({slow:26, normal:18, fast:11}[design.motionSpeed] || 18) + 's');
+}
+function restartMotion(){ document.querySelectorAll('#ots img, #full > img').forEach(applyMotion); }
+const END_MARGIN = 2, MIN_FULL = 4;
+function setSupImage(src, immediate){
   supSrc = src || '';
-  document.querySelectorAll('#framePlane img, #tabPlane img, #ots img, #full > img').forEach(im => { if (src) im.src = src; });
+  // si la pantalla completa todavía se está retirando, su imagen se cambia cuando ya no se ve (evita ver la nueva imagen un instante)
+  const fullImg = $('full').querySelector('img'), fullBusy = !immediate && ($('full').classList.contains('on') || performance.now() - fullOffAt < 650);
+  document.querySelectorAll('#framePlane img, #tabPlane img, #ots img').forEach(im => { if (src) im.src = src; });
+  if (src) { if (fullBusy) setTimeout(() => { if (supSrc === src && !$('full').classList.contains('on')) { fullImg.src = src; applyMotion(fullImg); } }, 650); else fullImg.src = src; }
+  if (src) { const imgs = document.querySelectorAll('#ots img, #full > img'); imgs.forEach(im => { if (im.complete) applyMotion(im); else im.onload = () => applyMotion(im); }); }
   $('framePlane').style.display = P.supFrame && supSrc ? 'block' : 'none';
   $('tabPlane').style.display = P.supTab && supSrc ? 'block' : 'none';
 }
@@ -243,14 +275,42 @@ function placeOts(){
   if (side === 'right') { left = Math.max(hx + gap, 0.5); w = Math.min(maxW, 1 - m - left); if (w < 0.22) { w = 0.22; left = 1 - m - w; } }
   else { const right = Math.min(hx - gap, 0.5); w = Math.min(maxW, right - m); if (w < 0.22) w = 0.22; left = Math.max(m, right - w); }
   left = Math.min(1 - w, Math.max(0, left + P.otsX));
-  const ots = $('ots'); ots.style.left = (left*100).toFixed(2)+'%'; ots.style.width = (w*100).toFixed(2)+'%'; ots.style.top = (P.otsY*100).toFixed(2)+'%';
+  let topPx = P.otsY * H; const hPx = w * W * 9 / 16;
+  if (P.subsOn) { const subsTop = H - (H*0.045 + ($('lower').offsetHeight || 150) + 44 + 110); if (topPx + hPx > subsTop - 16) topPx = Math.max(H*0.03, subsTop - 16 - hPx); }
+  if (P.clockOn && ((side === 'right') !== (P.clockPos === 'izquierda'))) { const c = $('clock'), minTop = H*0.04 + (c.offsetHeight || 50) + 18; if (topPx < minTop) topPx = minTop; }
+  const ots = $('ots'); ots.style.left = (left*100).toFixed(2)+'%'; ots.style.width = (w*100).toFixed(2)+'%'; ots.style.top = (topPx/H*100).toFixed(2)+'%';
 }
-function showSup(on, mode){
+// momento en que cada cobertura (pantalla completa, enlatado, espera) empezó a aparecer, para saber si ya es opaca
+let fullOffAt = -1e9;
+const coverSince = {full:0, canned:0, standby:0}, COVER_FADE = {full:550, canned:750, standby:750};
+const coverOn = () => ['full','cannedLayer','standbyLayer'].some(id => $(id).classList.contains('on'));
+function coverWaitMs(){
+  const now = performance.now(), on = {full:$('full').classList.contains('on'), canned:$('cannedLayer').classList.contains('on'), standby:$('standbyLayer').classList.contains('on')};
+  let w = 0; for (const k in on) if (on[k]) w = Math.max(w, COVER_FADE[k] - (now - coverSince[k])); return Math.max(0, w);
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+// titular, sección y exclusivo del cintillo: si ya está visible, el texto cambia con un fundido corto en vez de ocultar y volver a mostrar el cintillo
+// visibilidad según Diseño de EC1: sección (categoryVisible / visibility.category) y exclusivo (exclusiveEnabled / exclusiveBadgeVisible / visibility.exclusive)
+const catVisible = () => design.categoryVisible !== false && (design.visibility || {}).category !== false;
+const exclVisible = () => design.exclusiveEnabled !== false && design.exclusiveBadgeVisible !== false && (design.visibility || {}).exclusive !== false;
+let lowerExcl = false;
+function refreshLowerFlags(){ $('lCat').style.display = catVisible() ? '' : 'none'; $('lExcl').classList.toggle('show', lowerExcl && exclVisible()); }
+function setLower(title, cat, excl){
+  const apply = () => { $('lowerT').textContent = title || ''; $('lCat').textContent = String(cat || '').toUpperCase(); lowerExcl = !!excl; refreshLowerFlags(); };
+  const l = $('lower'); clearTimeout(setLower.t);
+  if (l.classList.contains('on') && $('lowerT').textContent && $('lowerT').textContent !== title) { l.classList.add('swap'); setLower.t = setTimeout(() => { apply(); l.classList.remove('swap'); }, 230); }
+  else { l.classList.remove('swap'); apply(); }
+}
+function showSup(on, mode, keepLower){
   supMode = mode || supMode; supShown = !!on && !!supSrc;
+  if (supShown && supMode === 'full' && !$('full').classList.contains('on')) coverSince.full = performance.now();
+  if (!(supShown && supMode === 'full') && $('full').classList.contains('on')) fullOffAt = performance.now();
   if (supMode === 'ots') placeOts();
-  $('ots').classList.toggle('on', supShown && supMode === 'ots');
+  // en la noticia, el recuadro se queda puesto debajo de la pantalla completa: al volver al plano medio ya está en su lugar
+  // (antes salía al pasar a pantalla completa y volvía a entrar deslizándose mientras la imagen se desvanecía)
+  $('ots').classList.toggle('on', supShown && (supMode === 'ots' || (supMode === 'full' && activeKind === 'news' && newsLayout)));
   $('full').classList.toggle('on', supShown && supMode === 'full');
-  $('lower').classList.toggle('on', !!on && activeKind === 'news' && supMode !== 'full' && !!$('lowerT').textContent);
+  if (!keepLower) $('lower').classList.toggle('on', !!on && (activeKind === 'news' || (activeKind === 'host' && hlIdx >= 0)) && !!$('lowerT').textContent);
 }
 
 // ---------------------------------------------------------------- diseño de EC1 (output:design)
@@ -283,24 +343,46 @@ function applyDesign(next = {}){
   set('--ec-date-weight', wt(d.dateFontWeight, 500)); set('--ec-excl-weight', wt(d.exclusiveFontWeight, 800));
   set('--ec-excl-bg', d.exclusiveBgColor || '#F7C600'); set('--ec-excl-color', d.exclusiveTextColor || '#000000'); set('--ec-excl-radius', px(d.exclusiveRadius, 5, 0, 30));
   $('fExcl').textContent = String(d.exclusiveText || 'EXCLUSIVO').slice(0, 32);
+  // cintillo: sección y exclusivo con las mismas opciones de Diseño de EC1 (tamaños proporcionales al cintillo)
+  const op = (v, def) => v == null ? def : Math.max(0, Math.min(1, Number(v)));
+  set('--l-cat-bg', rgba(d.categoryBgColor || '#F7C600', op(d.categoryBgOpacity, 1)));
+  set('--l-cat-radius', clamp(d.categoryRadius, 0, 40) + 'px');
+  set('--l-cat-size', Math.round(clamp(d.categoryFontSize == null ? 28 : d.categoryFontSize, 10, 48) * .86) + 'px');
+  set('--l-excl-bg', rgba(d.exclusiveBgColor || '#F7C600', op(d.exclusiveBgOpacity, 1)));
+  set('--l-excl-border', d.exclusiveBorderColor || d.exclusiveBgColor || '#F7C600'); set('--l-excl-border-w', clamp(d.exclusiveBorderWidth, 0, 8) + 'px');
+  set('--l-excl-size', Math.round(clamp(d.exclusiveFontSize == null ? 24 : d.exclusiveFontSize, 10, 48) * .9) + 'px');
+  $('lExcl').textContent = String(d.exclusiveText || 'EXCLUSIVO').slice(0, 32);
+  if (typeof refreshLowerFlags === 'function') refreshLowerFlags();
   audio.volume = vol(d.voiceVolume == null ? 100 : d.voiceVolume); video.volume = vol(d.cannedVolume == null ? 100 : d.cannedVolume);
   syncCustomFonts(d.customFonts).catch(() => {});
+  if (typeof setStandbySource === 'function') { setStandbySource(); standbyMusic(); }
+  if (supSrc) restartMotion();
 }
 function ecDate(v){ if (!v) return ''; const d = new Date(v); if (isNaN(d)) return ''; try { return new Intl.DateTimeFormat('es-PE',{day:'2-digit',month:'short',year:'numeric'}).format(d).replace(/\./g,'').toUpperCase(); } catch { return ''; } }
 
 // ---------------------------------------------------------------- audio y lip sync
 const audio = $('audio'), music = $('music'), video = $('cannedVideo');
 let actx = null, analyser = null, buf = new Float32Array(1024), tainted = false, silentFrames = 0, synthT = 0;
+let voiceSrc = null;
 function ensureAudioGraph(){
   if (actx) return;
-  try {
-    actx = new (window.AudioContext || window.webkitAudioContext)();
-    analyser = actx.createAnalyser(); analyser.fftSize = 1024;
-    actx.createMediaElementSource(audio).connect(analyser); analyser.connect(actx.destination);
-  } catch (e) { log('Web Audio no disponible, se usa lip sync sintético', e); tainted = true; }
+  try { actx = new (window.AudioContext || window.webkitAudioContext)(); analyser = actx.createAnalyser(); analyser.fftSize = 1024; }
+  catch (e) { log('Web Audio no disponible, se usa lip sync sintético', e); tainted = true; }
 }
+// El audio suena directo desde el elemento <audio>; Web Audio solo "escucha" una copia (captureStream) para mover el pico.
+// Así, aunque el análisis quede bloqueado, la voz siempre se oye.
+audio.addEventListener('playing', () => {
+  if (!actx || tainted) return;
+  try {
+    if (voiceSrc) { try { voiceSrc.disconnect(); } catch {} voiceSrc = null; }
+    const st = (audio.captureStream || audio.mozCaptureStream).call(audio);
+    if (st && st.getAudioTracks().length) { voiceSrc = actx.createMediaStreamSource(st); voiceSrc.connect(analyser); }
+  } catch (e) { log('captureStream no disponible; lip sync sintético', e); tainted = true; }
+});
+// normalización de volumen: EC1 manda p.audioGainDb medido al generar o importar cada audio
+const dbGain = db => Math.pow(10, (Number(db) || 0) / 20);
 function readLevel(dt){
-  if (!analyser || audio.paused || audio.ended || activeKind !== 'news') { silentFrames = 0; return 0; }
+  if (!analyser || audio.paused || audio.ended || (activeKind !== 'news' && activeKind !== 'host')) { silentFrames = 0; return 0; }
   if (tainted) return synthLevel(dt);
   analyser.getFloatTimeDomainData(buf);
   let s = 0, peak = 0; for (let i=0;i<buf.length;i++) { s += buf[i]*buf[i]; peak = Math.max(peak, Math.abs(buf[i])); }
@@ -314,8 +396,98 @@ function synthLevel(dt){
   return phrase * Math.pow(syl, 0.7) * accent;
 }
 
+// ---------------------------------------------------------------- reloj (hora local del equipo, formato 8:45 PM)
+function clockText(d = new Date()){ let h = d.getHours(); const m = String(d.getMinutes()).padStart(2, '0'), ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12; return `${h}:${m} ${ap}`; }
+function updateClock(){
+  const el = $('clock');
+  if (P.clockPos === 'izquierda') { el.style.left = '4%'; el.style.right = 'auto'; }
+  const show = P.clockOn && !standbyOn && activeKind !== 'canned';
+  if (show) { const t = clockText(); if (el.textContent !== t) el.textContent = t; }
+  el.classList.toggle('on', show);
+}
+setInterval(updateClock, 1000);
+
+// ---------------------------------------------------------------- subtítulos (texto exacto de la locución)
+// Lab.30: el texto es el mismo que lee la voz (titular + guion, igual que locutionSource en la automatización) y avanza
+// con la voz real: main manda los tramos con voz del WAV (p.speechSegments); cada oración se ancla a su pausa y dentro
+// de la oración el texto solo avanza mientras Merlín habla, con pesos del texto hablado (p.ttsScript: cifras en letras).
+// Sin tramos se usa el reparto proporcional a la duración (comportamiento anterior).
+let subsChunks = [], subsKey = '', subsMap = null;
+const subsSentences = t => String(t || '').replace(/\s+/g, ' ').trim().split(/(?<=[.!?;:])\s+/).filter(Boolean);
+function locutionText(title, script){
+  const t = String(title || '').trim(), s = String(script || '').trim(); if (!t) return s; if (!s) return t;
+  const clean = x => x.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  const ct = clean(t), cs = clean(s.slice(0, Math.max(t.length * 2, 220)));
+  return ct && cs.startsWith(ct) ? s : `${t}. ${s}`;
+}
+function buildSubs(text, segs, spoken){
+  subsChunks = []; subsKey = ''; subsMap = null;
+  const sentences = subsSentences(text); if (!sentences.length) return;
+  const sentW = [];
+  sentences.forEach((sen, si) => {
+    const words = sen.split(' '); let cur = [];
+    const push = c => subsChunks.push({words: c, sentence: si});
+    for (const w of words) { cur.push(w); if (cur.join(' ').length >= 58 || cur.length >= 11) { push(cur); cur = []; } }
+    if (cur.length) { const last = subsChunks[subsChunks.length - 1]; if (cur.length <= 2 && last && last.sentence === si && last.words.length < 13) last.words.push(...cur); else push(cur); }
+  });
+  let acc = 0; subsChunks = subsChunks.map(c => { const weight = c.words.join(' ').length + 6; const x = {...c, start: acc, weight}; acc += weight; return x; });
+  subsChunks.total = acc;
+  sentences.forEach((_, si) => { const cs = subsChunks.filter(c => c.sentence === si); sentW.push({c0: cs[0].start, c1: cs[cs.length - 1].start + cs[cs.length - 1].weight}); });
+  const spokenSent = subsSentences(spoken), timeW = spokenSent.length === sentences.length ? spokenSent.map(x => x.length + 6) : sentW.map(x => x.c1 - x.c0);
+  subsMap = alignSubs(Array.isArray(segs) ? segs : null, timeW, sentW);
+}
+function alignSubs(segs, w, sentW){
+  const seg = (segs || []).filter(x => Array.isArray(x) && x[1] > x[0]).sort((a, b) => a[0] - b[0]);
+  if (!seg.length) return null;
+  const vStart = []; let T = 0; for (const x of seg) { vStart.push(T); T += x[1] - x[0]; }
+  if (T <= 0) return null;
+  const gaps = []; for (let i = 0; i + 1 < seg.length; i++) gaps.push({v: vStart[i] + seg[i][1] - seg[i][0], dur: seg[i + 1][0] - seg[i][1], idx: i});
+  const W = w.reduce((a, b) => a + b, 0) || 1, len = w.map(x => T * x / W), bounds = [0];
+  let expected = 0, lastGap = -1;
+  for (let k = 1; k < w.length; k++) {
+    expected += len[k - 1];
+    const tol = 0.45 * Math.min(len[k - 1], len[k]);
+    let best = null, bestScore = Infinity;
+    for (const g of gaps) { if (g.idx <= lastGap || g.dur < 0.18 || Math.abs(g.v - expected) > tol) continue; const sc = Math.abs(g.v - expected) - 0.15 * g.dur; if (sc < bestScore) { bestScore = sc; best = g; } }
+    if (best) { lastGap = best.idx; bounds.push(best.v); } else bounds.push(Math.max(bounds[bounds.length - 1], expected));
+  }
+  bounds.push(T);
+  const voicedAt = t => { let v = 0; for (let i = 0; i < seg.length; i++) { const [a, b] = seg[i]; if (t <= a) break; v += Math.min(t, b) - a; } return v; };
+  return {T, bounds, sentW, voicedAt};
+}
+function subsPos(){
+  if (!subsMap) return Math.min(1, audio.currentTime / audio.duration) * subsChunks.total;
+  const m = subsMap, v = m.voicedAt(audio.currentTime);
+  // en la pausa (v justo en el límite) queda la oración terminada; la siguiente aparece cuando vuelve la voz
+  let k = m.sentW.length - 1; for (let i = 0; i < m.sentW.length; i++) { if (v <= m.bounds[i + 1]) { k = i; break; } }
+  const span = Math.max(1e-6, m.bounds[k + 1] - m.bounds[k]), frac = Math.max(0, Math.min(1, (v - m.bounds[k]) / span));
+  return m.sentW[k].c0 + frac * (m.sentW[k].c1 - m.sentW[k].c0 - 1e-6);
+}
+function updateSubs(){
+  const el = $('subs');
+  const live = P.subsOn && subsChunks.length && (activeKind === 'news' || activeKind === 'host') && !audio.paused && !audio.ended && audio.duration > 0;
+  if (!live) { el.classList.remove('on'); return; }
+  const pos = subsPos();
+  let c = subsChunks[subsChunks.length - 1]; for (const x of subsChunks) { if (pos < x.start + x.weight) { c = x; break; } }
+  const inner = Math.max(0, Math.min(1, (pos - c.start) / c.weight)), n = c.words.length, said = Math.min(n, Math.floor(inner * (n + 1)));
+  const key = subsChunks.indexOf(c) + ':' + said;
+  if (key !== subsKey) {
+    subsKey = key;
+    const esc = t => t.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]);
+    el.innerHTML = esc(c.words.slice(0, said).join(' ')) + (said < n ? ' <span class="f">' + esc(c.words.slice(said).join(' ')) + '</span>' : '');
+  }
+  const lower = $('lower');
+  el.style.bottom = lower.classList.contains('on') ? (H*0.045 + lower.offsetHeight + 44) + 'px' : '7%';
+  el.classList.add('on');
+}
+
+// ---------------------------------------------------------------- expresión según el tono de la noticia (p.tone: serio | neutral | ligero)
+const TONES = { serio:{sway:.35, wings:.25, lid:14, blinkMin:4, blinkMax:7, gazeAway:.12, brow:-1}, neutral:{sway:1, wings:1, lid:0, blinkMin:3, blinkMax:6, gazeAway:.3, brow:0}, ligero:{sway:1.4, wings:1.4, lid:0, blinkMin:2.5, blinkMax:5, gazeAway:.35, brow:1} };
+let toneName = 'neutral'; const toneNow = {...TONES.neutral};
+function setTone(t){ toneName = TONES[t] ? t : 'neutral'; }
+
 // ---------------------------------------------------------------- flujo de historias (mismo contrato que output.js)
-let activeKind = 'none', source = 'none', serial = 0, afterBreak = true, altT = 0, introTimer = null, renderPaused = false;
+let hlIdx = -1, headlines = [], hlIntroSec = 4, activeKind = 'none', source = 'none', serial = 0, afterBreak = true, altT = 0, introTimer = null, renderPaused = false;
 function playback(type, message = ''){ try { window.ECAPI.outputPlayback({type, source, kind:activeKind, message}); } catch {} }
 function waitImage(src, timeout = 2500){
   return new Promise(res => { if (!src) return res(false); const im = new Image(); let done = false; const fin = ok => { if (!done) { done = true; clearTimeout(t); res(ok); } };
@@ -330,7 +502,40 @@ async function startMusic(){
 function hideCanned(){
   const layer = $('cannedLayer'); if (!layer.classList.contains('on')) return;
   renderPaused = false; layer.classList.remove('on');
-  setTimeout(() => { if (activeKind === 'news') { try { video.pause(); video.removeAttribute('src'); video.load(); } catch {} } }, 800);
+  // Lab.30: el video se pausa en el acto (antes seguía sonando bajo Merlín en la despedida o el pase)
+  try { video.pause(); } catch {}
+  setTimeout(() => { if (activeKind !== 'canned') { try { video.removeAttribute('src'); video.load(); } catch {} } }, 800);
+}
+// ---- video de espera (standby), igual que output-0331.js: al abrir la salida y tras 'stop'
+const standbyEl = $('standbyLayer'), standbyVideo = $('standbyVideo');
+let standbyOn = true, standbyTimer = null;
+function setStandbySource(){
+  const url = String(design.standbyVideoUrl || '');
+  if (!url) { standbyVideo.pause(); standbyVideo.removeAttribute('src'); try { standbyVideo.load(); } catch {} return; }
+  if (standbyVideo.getAttribute('src') !== url) { standbyVideo.src = url; standbyVideo.loop = true; standbyVideo.muted = true; standbyVideo.load(); }
+  if (standbyOn) standbyVideo.play().catch(() => {});
+}
+function standbyMusic(){
+  const url = String(design.musicUrl || '');
+  if (!standbyOn || !design.musicEnabled || !url) return;
+  if ((music.getAttribute('src') || '') !== url) { music.src = url; music.load(); }
+  music.loop = design.musicLoop !== false; music.volume = vol(design.musicVolume == null ? 20 : design.musicVolume);
+  if (music.paused) music.play().catch(() => {});
+}
+function showStandby(){
+  standbyOn = true; clearTimeout(standbyTimer); clearTimeout(introTimer);
+  audio.pause(); video.pause(); showSup(false); $('lower').classList.remove('on');
+  activeKind = 'none'; afterBreak = true; newsLayout = false;
+  renderPaused = false; if (!standbyEl.classList.contains('on')) coverSince.standby = performance.now(); standbyEl.classList.add('on');
+  if (standbyVideo.getAttribute('src')) standbyVideo.play().catch(() => {});
+  standbyMusic();
+  standbyTimer = setTimeout(() => { if (standbyOn) { renderPaused = true; setCam(0, true); } }, 800);
+}
+function hideStandby(){
+  if (!standbyOn) return;
+  standbyOn = false; clearTimeout(standbyTimer); renderPaused = false;
+  standbyEl.classList.remove('on');
+  standbyTimer = setTimeout(() => { if (!standbyOn) standbyVideo.pause(); }, 800);
 }
 async function showNews(p, my){
   clearTimeout(introTimer);
@@ -341,35 +546,60 @@ async function showNews(p, my){
   if (my !== serial) return;
   if (p.preloadImage) { const pre = new Image(); pre.src = p.preloadImage; }
   // textos generados por la IA local de EC1
-  $('lowerT').textContent = p.title || '';
+  const lowerWasOn = $('lower').classList.contains('on') && activeKind === 'news';
+  setLower(p.title, p.category || 'ACTUALIDAD', !!p.isExclusive);
+  buildSubs(locutionText(p.title, p.script || p.summary || ''), p.speechSegments, p.ttsScript); setTone(p.tone); hlIdx = -1;
   $('fTitle').textContent = p.title || ''; $('fSummary').textContent = p.summary || '';
   $('fCat').textContent = String(p.category || 'ACTUALIDAD').toUpperCase(); $('fDate').textContent = ecDate(p.pubDate || p.date || '');
   $('fExcl').classList.toggle('show', !!p.isExclusive && design.exclusiveEnabled !== false);
   const wasBreak = afterBreak; afterBreak = false;
-  activeKind = 'news'; hideCanned(); showSup(false);
+  // el corte de cámara se hace con la pantalla totalmente cubierta (si hay una cobertura apareciendo, se espera a que sea opaca);
+  // si la nota anterior ya estaba en el mismo plano, la cámara no se toca
+  const w = coverWaitMs(); if (w) { await sleep(w); if (my !== serial) return; }
+  const sameShot = !wasBreak && newsLayout && camIdx === 1;
+  newsLayout = !wasBreak; if (!sameShot) setCam(wasBreak ? 0 : 1, coverOn());
+  activeKind = 'news'; hideStandby(); hideCanned(); showSup(false, null, lowerWasOn && !wasBreak);
   setSupImage(src);
   // dirección: tras una pausa (inicio, enlatado o anuncio) abre en plano general; luego plano medio con la imagen
-  const toNews = () => { if (my !== serial) return; newsLayout = true; setCam(1); shotDur = P.altSec; altT = 0; showSup(true, 'ots'); };
-  if (wasBreak) { newsLayout = false; setCam(0); introTimer = setTimeout(toNews, P.introSec * 1000); } else toNews();
+  const toNews = () => { if (my !== serial) return; if (!(newsLayout && camIdx === 1)) setCam(1, coverOn()); newsLayout = true; shotDur = P.altSec; altT = 0; showSup(true, 'ots'); };
+  if (wasBreak) introTimer = setTimeout(toNews, P.introSec * 1000); else toNews();
   startMusic().catch(() => {});
   ensureAudioGraph(); if (actx && actx.state === 'suspended') actx.resume().catch(() => {});
   synthT = 0; silentFrames = 0;
-  audio.volume = vol(design.voiceVolume == null ? 100 : design.voiceVolume);
-  if (p.audioUrl) { audio.src = p.audioUrl; audio.currentTime = 0; audio.play().catch(e => playback('error', e.message || 'No se pudo iniciar el audio')); }
+  audio.volume = Math.min(1, vol(design.voiceVolume == null ? 100 : design.voiceVolume) * dbGain(p.audioGainDb));
+  if (p.audioUrl) { audio.src = p.audioUrl; audio.currentTime = 0; audio.play().catch(e => { if (my === serial && e && e.name !== 'AbortError') playback('error', e.message || 'No se pudo iniciar el audio'); }); }
   else playback('ended');
+}
+// intervenciones de Merlín (presentación, pase, regreso, despedida): solo voz, sin imagen ni zócalos
+let hostSegment = '';
+function hostReport(type, message = ''){ try { window.ECAPI.presenterHostPlayback && window.ECAPI.presenterHostPlayback({type, segment:hostSegment, message}); } catch {} }
+async function showHost(p, my){
+  clearTimeout(introTimer); hostSegment = String(p.segment || '');
+  buildSubs(p.hostText || '', p.speechSegments, ''); setTone(hostSegment === 'despedida' ? 'neutral' : 'ligero');
+  headlines = Array.isArray(p.headlines) ? p.headlines.slice(0, 6) : []; hlIdx = -1; hlIntroSec = Number(p.headlinesIntroSec) || 4; if (Array.isArray(p.headlineMarks)) headlines.marks = p.headlineMarks.map(Number);
+  { const w = coverWaitMs(); if (w) { await sleep(w); if (my !== serial) return; } }
+  newsLayout = false;
+  if (hostSegment === 'pase' || hostSegment === 'despedida') setCam(2, coverOn()); else { setCam(0, coverOn()); if (hostSegment !== 'titulares') afterBreak = false; }
+  activeKind = 'host'; hideStandby(); hideCanned(); showSup(false); $('lower').classList.remove('on');
+  ensureAudioGraph(); if (actx && actx.state === 'suspended') actx.resume().catch(() => {});
+  synthT = 0; silentFrames = 0; audio.volume = Math.min(1, vol(design.voiceVolume == null ? 100 : design.voiceVolume) * dbGain(p.audioGainDb));
+  if (my !== serial) return;
+  if (p.audioUrl) { audio.src = p.audioUrl; audio.currentTime = 0; audio.play().catch(e => { if (my === serial && e && e.name !== 'AbortError') hostReport('error', e.message || 'No se pudo iniciar el audio'); }); }
+  else hostReport('ended');
 }
 async function showCanned(p, my){
   clearTimeout(introTimer); audio.pause();
-  activeKind = 'canned'; afterBreak = true; showSup(false); $('lower').classList.remove('on');
+  activeKind = 'canned'; afterBreak = true; hideStandby(); showSup(false); $('lower').classList.remove('on');
   try { await (async () => { if (!music.paused) music.pause(); })(); } catch {}
-  video.src = p.videoUrl || ''; video.volume = vol(design.cannedVolume == null ? 100 : design.cannedVolume); video.load();
+  video.src = p.videoUrl || ''; video.volume = Math.min(1, vol(design.cannedVolume == null ? 100 : design.cannedVolume) * dbGain(p.audioGainDb)); video.load();
   if (my !== serial) return;
+  if (!$('cannedLayer').classList.contains('on')) coverSince.canned = performance.now();
   $('cannedLayer').classList.add('on');
   setTimeout(() => { if (activeKind === 'canned') renderPaused = true; }, 800);
   video.play().catch(e => playback('error', e.message || 'No se pudo reproducir el video'));
 }
-audio.addEventListener('ended', () => { if (activeKind === 'news') playback('ended'); });
-audio.addEventListener('error', () => { if (activeKind === 'news' && audio.src) playback('error', 'No se pudo cargar el audio'); });
+audio.addEventListener('ended', () => { if (activeKind === 'news') playback('ended'); else if (activeKind === 'host') hostReport('ended'); });
+audio.addEventListener('error', () => { if (!audio.src) return; if (activeKind === 'news') playback('error', 'No se pudo cargar el audio'); else if (activeKind === 'host') hostReport('error', 'No se pudo cargar el audio'); });
 video.addEventListener('ended', () => { if (activeKind === 'canned') playback('ended'); });
 video.addEventListener('error', () => { if (activeKind === 'canned' && video.getAttribute('src')) playback('error', 'No se pudo cargar el video'); });
 
@@ -379,13 +609,17 @@ if (api) {
   api.on('output:story', p => {
     p = p || {}; source = p.source || 'none'; if (p.design) applyDesign(p.design);
     const my = ++serial;
-    if ((p.kind || 'news') === 'canned') showCanned(p, my).catch(e => playback('error', e.message || String(e)));
+    if (p.kind === 'host') showHost(p, my).catch(e => hostReport('error', e.message || String(e)));
+    else if ((p.kind || 'news') === 'canned') showCanned(p, my).catch(e => playback('error', e.message || String(e)));
     else showNews(p, my).catch(e => playback('error', e.message || String(e)));
   });
   api.on('output:control', a => {
     if (a === 'play') { if (activeKind === 'canned') video.play().catch(() => {}); else { audio.play().catch(() => {}); startMusic().catch(() => {}); } }
-    if (a === 'pause') { if (activeKind === 'canned') video.pause(); else audio.pause(); music.pause(); }
-    if (a === 'stop') { audio.pause(); try { audio.currentTime = 0; } catch {} video.pause(); music.pause(); clearTimeout(introTimer); showSup(false); hideCanned(); activeKind = 'none'; afterBreak = true; newsLayout = false; setCam(0); }
+    if (a === 'pause') { if (activeKind === 'canned') video.pause(); else audio.pause(); music.pause(); stageEl.classList.add('paused-motion'); }
+    if (a === 'play' || a === 'stop') stageEl.classList.remove('paused-motion');
+    if (a === 'stop') { try { audio.currentTime = 0; } catch {} music.pause(); hideCanned(); showStandby(); }
+    if (a === 'play' && standbyOn) { standbyVideo.play().catch(() => {}); standbyMusic(); }
+    if (a === 'pause' && standbyOn) standbyVideo.pause();
   });
   (async () => { try { const s = await api.getSettings(); applyDesign((s && s.visual && s.visual.output) || {}); } catch { applyDesign({}); } })();
 } else log('ECAPI no disponible');
@@ -401,25 +635,44 @@ function tick(){
   const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
   if (!modelReady || renderPaused) return;
   // alternancia recuadro ↔ pantalla completa durante la noticia
+  // la noticia siempre termina en plano medio: se vuelve de la pantalla completa 2 s antes del final,
+  // y no se abre una pantalla completa que no alcance a durar al menos 4 s antes de ese margen
   if (activeKind === 'news' && newsLayout && supSrc && P.supAlt && !audio.paused) {
     altT += dt;
-    if (altT >= P.altSec) {
-      altT = 0; const next = supMode === 'ots' ? 'full' : 'ots'; showSup(true, next);
-      if (next === 'full') setTimeout(() => { if (supMode === 'full' && supShown) kb = 0; }, 700);
+    const left = audio.duration > 0 ? audio.duration - audio.currentTime : Infinity;
+    if (supMode === 'full' && left <= END_MARGIN) { altT = 0; showSup(true, 'ots'); }
+    else if (altT >= P.altSec) {
+      const next = supMode === 'ots' ? 'full' : 'ots';
+      if (next === 'ots' || left > END_MARGIN + MIN_FULL) { altT = 0; showSup(true, next); }
     }
   }
+  // titulares: tras la entrada, cada titular aparece a pantalla completa con su imagen y el cintillo
+  if (activeKind === 'host' && hostSegment === 'titulares' && headlines.length && audio.duration > 0 && !audio.paused) {
+    // cada titular dura en proporción a su largo (igual que los subtítulos), o según p.headlineMarks si EC1 los envía
+    const marks = Array.isArray(headlines.marks) ? headlines.marks : null;
+    let idx = -1;
+    if (marks) { for (let i = 0; i < marks.length; i++) if (audio.currentTime >= marks[i]) idx = i; }
+    else if (audio.currentTime >= hlIntroSec) {
+      const ws = headlines.map(h => String(h.title || '').length + 6), tot = ws.reduce((a, b) => a + b, 0) || 1, pos = (audio.currentTime - hlIntroSec) / Math.max(1, audio.duration - hlIntroSec) * tot;
+      let acc = 0; idx = headlines.length - 1; for (let i = 0; i < ws.length; i++) { acc += ws[i]; if (pos < acc) { idx = i; break; } }
+    }
+    if (idx !== hlIdx) { hlIdx = idx; if (idx >= 0) { const h = headlines[idx]; setSupImage(h.image || '', true); $('lowerT').textContent = h.title || ''; $('lCat').textContent = String(h.category || '').toUpperCase(); lowerExcl = !!h.isExclusive; refreshLowerFlags(); showSup(true, 'full'); $('lower').classList.toggle('on', !!h.title); } }
+  }
+  updateSubs();
+  for (const k in toneNow) toneNow[k] += (TONES[toneName][k] - toneNow[k]) * Math.min(1, 1.5 * dt);
   const lvl = readLevel(dt);
   mouth += (lvl - mouth) * Math.min(1, (lvl > mouth ? 35 : P.release) * dt);
   const open = mouth * P.maxOpen;
   setBone('BOCA_INF', -open, 0, 0); setBone('BOCA_SUP', open * P.upper, 0, 0);
   let lid = 0;
-  if (P.blink) { blinkT += dt; if (blinkT >= nextBlink) { lid = blinkCurve(blinkT - nextBlink); if (blinkT - nextBlink > .16) { blinkT = 0; nextBlink = 3 + Math.random()*3; } } }
-  setBone('PARPADOS_MAYA', lid * 121, 0, 0);
-  if (P.gazeOn) { nextGaze -= dt; if (nextGaze <= 0) { const away = Math.random() < .3; gazeTarget = away ? {x:(Math.random()*2-1)*4, z:(Math.random()*2-1)*9} : {x:0, z:0}; nextGaze = away ? .6 + Math.random()*.8 : 2 + Math.random()*3; } }
+  if (P.blink) { blinkT += dt; if (blinkT >= nextBlink) { lid = blinkCurve(blinkT - nextBlink); if (blinkT - nextBlink > .16) { blinkT = 0; nextBlink = toneNow.blinkMin + Math.random()*(toneNow.blinkMax - toneNow.blinkMin); } } }
+  setBone('PARPADOS_MAYA', Math.max(toneNow.lid, lid * 121), 0, 0);
+  { const bv = toneNow.brow * P.browAmp, bx = P.browAxis === 'x' ? bv : 0, by = P.browAxis === 'y' ? bv : 0, bz = P.browAxis === 'z' ? bv : 0; setBone('CEJA_L', bx, by, bz); setBone('CEJA_R', bx, by, P.browAxis === 'z' ? -bz : bz); }
+  if (P.gazeOn) { nextGaze -= dt; if (nextGaze <= 0) { const away = Math.random() < toneNow.gazeAway; gazeTarget = away ? {x:(Math.random()*2-1)*4, z:(Math.random()*2-1)*9} : {x:0, z:0}; nextGaze = away ? .6 + Math.random()*.8 : 2 + Math.random()*3; } }
   gaze.x += (gazeTarget.x - gaze.x) * Math.min(1, 14*dt); gaze.z += (gazeTarget.z - gaze.z) * Math.min(1, 14*dt);
   setBone('OJO_R', gaze.x, 0, gaze.z); setBone('OJO_L', gaze.x, 0, gaze.z);
   let hx = 0, hy = 0, hz = 0;
-  if (P.headOn) { const talk = 1 + mouth*1.5*P.headTalk; hx = Math.sin(t*.9)*1.2*talk + mouth*3*P.headTalk; hy = Math.sin(t*.45 + 1)*3*talk; hz = Math.sin(t*.6 + 2)*2*talk; }
+  if (P.headOn) { const talk = (1 + mouth*1.5*P.headTalk) * toneNow.sway; hx = Math.sin(t*.9)*1.2*talk + mouth*3*P.headTalk; hy = Math.sin(t*.45 + 1)*3*talk; hz = Math.sin(t*.6 + 2)*2*talk; }
   setBone('CABEZA', hx, hy - P.rotY * P.look, hz);
   const br = P.breath ? Math.sin(t*Math.PI*2/4) : 0;
   setBone('COLUMNA', br*1.2, 0, 0);
@@ -427,7 +680,7 @@ function tick(){
   talkE += (targetE - talkE) * Math.min(1, (targetE > talkE ? 2.5 : .8) * dt);
   if (lvl > .75 && prevLvl < .45 && gestT <= 0 && Math.random() < .35) { gestSide = Math.random() < .5 ? 'R' : 'L'; gestT = 1; }
   prevLvl = lvl; gestT = Math.max(0, gestT - dt*1.4);
-  const g = Math.sin(Math.PI*gestT) * P.wingTalk, en = talkE * P.wingTalk;
+  const g = Math.sin(Math.PI*gestT) * P.wingTalk * toneNow.wings, en = talkE * P.wingTalk * toneNow.wings;
   const liftR = en*(5 + 3*Math.sin(t*1.3 + .5) + 2*Math.sin(t*2.3)) + (gestSide === 'R' ? g*12 : 0);
   const liftL = en*(5 + 3*Math.sin(t*1.1 + 2.1) + 2*Math.sin(t*2.7 + 1)) + (gestSide === 'L' ? g*12 : 0);
   const fwdR = en*(4 + 3*Math.sin(t*.9 + 1.2)) + (gestSide === 'R' ? g*10 : 0), fwdL = en*(4 + 3*Math.sin(t*.8 + 3)) + (gestSide === 'L' ? g*10 : 0);
@@ -437,5 +690,6 @@ function tick(){
 }
 applyScene();
 requestAnimationFrame(tick);
-window.__merlinOutput = { P, cams, setCam, showSup, state:() => ({activeKind, camIdx, supMode, supShown, newsLayout, tainted}) };
+showStandby();
+window.__merlinOutput = { P, cams, setCam, showSup, state:() => ({activeKind, camIdx, supMode, supShown, newsLayout, tainted, toneName, hlIdx, subs:$('subs').textContent}) };
 })();

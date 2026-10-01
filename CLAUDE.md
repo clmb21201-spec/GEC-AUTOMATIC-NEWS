@@ -1,3 +1,5 @@
+Responde siempre en español.
+
 # GEC Automatic News (V2.0 TTS Lab)
 
 App de escritorio Electron (Windows, portable) que arma una emisión automática de noticias: lee RSS, extrae la nota y su imagen, una IA local escribe titular, bajada y guion, un TTS local genera la voz, y la ventana de salida lo emite. Hay también enlatados (videos) y anuncios. La interfaz y los mensajes están en español.
@@ -32,6 +34,26 @@ Ver `INTEGRACION_MERLIN.md`. Resumen:
 - Huesos usados: `BOCA_INF` (abre en X negativo), `BOCA_SUP` (X positivo), `PARPADOS_MAYA` (X: 0 abierto, 121 cerrado), `OJO_R`/`OJO_L`, `CABEZA`, `COLUMNA`, `ALA_SUP_R`/`ALA_SUP_L` (se reparentan a `COLUMNA` al cargar). Rotaciones relativas a la pose de reposo.
 - Respaldos: si WebGL o el modelo fallan, vuelve a `output.html`; si el análisis de audio queda bloqueado, lip sync sintético.
 
+## Intervenciones de Merlín (hechas)
+
+Presentación, pase a corte, regreso y despedida con frases fijas (`src/assets/merlin/presenter-phrases.json`), audio generado con el TTS local y cacheado en `data/presenter-voice/`. Lógica en `presenterHost` (final de `src/main.js`); la salida maneja `p.kind === 'host'` y avisa el fin con `ECAPI.presenterHostPlayback`. En la salida clásica se omiten. Ver `INTEGRACION_MERLIN.md`.
+
+## Merlín: subtítulos, cintillo, reloj, cámara, expresión, volumen y titulares (hechos)
+
+Ver `INTEGRACION_MERLIN.md` (secciones "Diseño en pantalla", "Cámara", "Expresión", "Volumen normalizado" y "Titulares periódicos"). Opciones nuevas en `presenter-config.js`: `subtitulos`, `reloj`, `titulares`, `volumen`, `expresion`, `camaras.planoMedioCentradoAuto`.
+
+- Tono (`p.tone`): lo devuelve la IA editorial (`editorial.js`) y se agrega a todos los payloads de noticia. Volumen de enlatados y anuncios: `renderer-media-loudness.js` mide con Web Audio, `services/mediaLoudnessMerlin.js` guarda en `data/media-loudness.json` y `main.js` agrega `p.audioGainDb` al payload `kind:'canned'`.
+
+## Lab.30 (correcciones)
+
+- Merlín: NDI solo en la vista clásica (`presenterNdiGuard` al final de `main.js` + `renderer-merlin-ndi-lab30.js`); vista previa de Merlín en el área de Diseño (`renderer-merlin-preview-lab30.js` carga `output-merlin-preview.html`, muda, con `output-merlin-preview-adapter.js`).
+- Optimización: `services/releaseV2GpuIsolationLab30.js` libera la GPU entre voz e IA de texto (espera la salida real de los procesos), aborta si otro programa ocupa más de 2,5 GB de VRAM, mide la voz Qwen con 3 repeticiones sin la configuración de diagnóstico, descarta antes las configuraciones lentas de la IA de texto y permite cancelar (`renderer-optimization-lab30.js`: botón, tiempo transcurrido y restante).
+- Qwen zero-shot: `tts_lab_worker.py` pasa a `qwen_tts` los `VoiceClonePromptItem` con la transcripción (con el dict fallaba con `'NoneType' object is not subscriptable`).
+- Instalación de motores: `removeTorchShadow` es asíncrono (borrar PyTorch con `rmSync` congelaba la ventana).
+- Limpieza de pausas de Chatterbox (`chatterbox_pause_cleanup_lab29.py`): se copia a `resources/runtime/tts-lab/` (`extraResources`) porque Python no puede leerla dentro de `app.asar`; antes no se ejecutaba en el EXE. Cada limpieza o fallo queda en `logs/chatterbox-cleanup.log`. Solo silencia bursts tipo ruido; los fragmentos tipo voz no se tocan para no cortar palabras.
+- Subtítulos de Merlín: muestran lo mismo que lee la voz (titular + guion) y avanzan con la voz real: `presenterHost` manda `p.speechSegments` (tramos con voz del WAV) y la automatización `p.ttsScript`; cada oración se ancla a su pausa.
+- Merlín: al ocultar un contenido o anuncio (pase, despedida) el video se pausa en el acto. Normalización: voz, contenidos y anuncios usan `p.audioGainDb`; la música de fondo no.
+
 ## Pendiente
 
-- Fase 2 de Merlín: segmentos de presentación y despedida (nuevo tipo `host` con `segment: 'intro' | 'outro'`, textos de la IA local, voz del TTS local, insertados por el planificador al inicio y antes de cada bloque de enlatados o anuncios).
+- Integrar en modo Merlín la promo de YouTube y el envío por NDI (hoy NDI queda bloqueado con aviso en modo Merlín).
