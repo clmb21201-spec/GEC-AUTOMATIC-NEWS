@@ -78,4 +78,4 @@ function installIpc(){const bind=(name,fn)=>{try{ipcMain.removeHandler(name);}ca
 }
 
 function installReleaseV2Lab(){installProfileRouting();installSettings();installTtsRouting();installProcessingWarmup();installIpc();let recoveryStarted=false;const recover=()=>{if(recoveryStarted)return;recoveryStarted=true;setTimeout(()=>labRuntime().recoverAllTransactions().catch(()=>{}),250);};app.on('browser-window-created',(_,win)=>{try{win.webContents.once('did-finish-load',()=>{try{if(/control\.html(?:\?|$)/i.test(String(win.webContents.getURL()||'')))recover();}catch{}});}catch{}});app.whenReady().then(()=>setTimeout(recover,8000)).catch(()=>{});}
-module.exports={installReleaseV2Lab,normalizeProfileTts,captureOptimization,applyOptimization,optimizationKey,qwenModelIdentity,ttsRuntimeSignature,PROFILE_TTS_KEYS};
+module.exports={installReleaseV2Lab,labRuntime,normalizeProfileTts,captureOptimization,applyOptimization,optimizationKey,qwenModelIdentity,ttsRuntimeSignature,PROFILE_TTS_KEYS};

@@ -43,4 +43,5 @@ if(!gotLock){app.quit();}else{
   require('./services/releaseV2UxRepairLab29').installReleaseV2UxRepairLab29();
   require('./services/releaseV2FinalCorrectionsLab29').installReleaseV2FinalCorrectionsLab29();
   require('./services/releaseV2GpuIsolationLab30').installReleaseV2GpuIsolationLab30();
+  require('./services/releaseV2QwenSpeedLab31').installReleaseV2QwenSpeedLab31();
 }

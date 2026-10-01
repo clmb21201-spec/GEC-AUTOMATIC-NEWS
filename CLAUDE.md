@@ -54,6 +54,18 @@ Ver `INTEGRACION_MERLIN.md` (secciones "Diseño en pantalla", "Cámara", "Expres
 - Subtítulos de Merlín: muestran lo mismo que lee la voz (titular + guion) y avanzan con la voz real: `presenterHost` manda `p.speechSegments` (tramos con voz del WAV) y la automatización `p.ttsScript`; cada oración se ancla a su pausa.
 - Merlín: al ocultar un contenido o anuncio (pase, despedida) el video se pausa en el acto. Normalización: voz, contenidos y anuncios usan `p.audioGainDb`; la música de fondo no.
 
+## Lab.31 (velocidad de Qwen3-TTS)
+
+- `src/qwen_speed_lab31.py` (lo copia `prepare-windows-runtime.ps1` junto al worker; el worker lo importa agregando su carpeta a `sys.path`):
+  - `balanced_chunks`: solo fine-tuned con `chunkMode:'sentences'`. Corta al final de una oración en fragmentos parejos de hasta `chunkChars` (360) y, con lotes, arma tantos como entren en el lote sin bajar de `minChunkChars` (200).
+  - `join_pieces`: recorta silencios, pausa fija `joinPauseMs` (300), fundido de 15 ms y volumen parejo (±3 dB).
+  - `PredictorGraphs`: el predictor de código (15 pasos por frame) desenrollado y grabado en un CUDA graph por tamaño de lote. Se verifica contra el `generate` original (≥ 85 % de coincidencia, forzado con las mismas fichas) y ante cualquier falla vuelve al original. Parámetro `predictorCudaGraphs`.
+- `services/releaseV2QwenSpeedLab31.js`:
+  - Después de la optimización de Lab.30 mide "Aceleración del predictor" (3 repeticiones con el mismo texto) y, solo en fine-tuned, una nota típica, una corta y la prueba de escucha. Los audios van a `data/tts-lab/ab-test/`.
+  - Lo elegido se guarda por modelo en `data/tts-lab/qwen-speed-lab31.json` y se inyecta en cada `generate` de Qwen; la medición base siempre parte sin eso.
+  - IPC `qwenSpeed:get` / `qwenSpeed:setChunkMode`; panel en `renderer-qwen-speed-lab31.js`.
+- Insignia "SIN OPTIMIZAR" con el fine-tuned: el optimizador guardaba `optimization0321` sin `ttsOptimizationKey` y `releaseV2Lab` lo reemplazaba por la optimización anterior en caché. Ahora la clave se completa antes de guardar.
+
 ## Pendiente
 
 - Integrar en modo Merlín la promo de YouTube y el envío por NDI (hoy NDI queda bloqueado con aviso en modo Merlín).
