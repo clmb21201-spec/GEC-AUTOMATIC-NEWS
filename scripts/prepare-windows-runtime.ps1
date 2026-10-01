@@ -36,6 +36,7 @@ $ttsLabDir = Join-Path $Runtime 'tts-lab'
 if (Test-Path $ttsLabDir) { Remove-Item $ttsLabDir -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $ttsLabDir | Out-Null
 Copy-Item (Join-Path $Root 'src\tts_lab_worker.py') (Join-Path $ttsLabDir 'tts_lab_worker.py') -Force
+Copy-Item (Join-Path $Root 'src\qwen_speed_lab31.py') (Join-Path $ttsLabDir 'qwen_speed_lab31.py') -Force
 if (-not (Test-Path (Join-Path $ttsLabDir 'tts_lab_worker.py'))) { throw 'No se pudo preparar el worker de TTS Lab.' }
 
 Write-Host "== Descargando llama.cpp Windows x64 fijado en $LlamaRelease =="

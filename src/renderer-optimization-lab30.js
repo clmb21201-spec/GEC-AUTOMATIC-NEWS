@@ -33,6 +33,8 @@
     if (kind === 'voice') {
       if (p === 'candidate' || p === 'measure') { key = 'voz · configuraciones'; const i = Number(e.index) || 1, n = Number(e.total) || 1, r = Number(e.repeatIndex) || 0, rt = Number(e.repeatTotal) || 3; frac = ((i - 1) + (p === 'measure' ? r / (rt + 2) : 0)) / n; }
       else if (p === 'batch' || p === 'batch-run') { key = 'voz · lotes'; const i = Number(e.index) || 1, n = Number(e.total) || 1, r = Number(e.repeatIndex) || 0, rt = Number(e.repeatTotal) || 2; frac = ((i - 1) + (p === 'batch-run' ? r / (rt + 2) : 0)) / n; }
+      // Lab.31: aceleración del predictor y notas realistas
+      else if (p === 'lab31-graphs' || p === 'lab31-note') { key = p === 'lab31-graphs' ? 'voz · aceleración del predictor' : 'voz · notas realistas'; const i = Number(e.index) || 1, n = Number(e.total) || 1; frac = (i - 1) / n; }
     } else if (kind === 'local') {
       if (p === 'candidate') { local.i = Number(e.index) || 1; local.n = Number(e.total) || 5; local.c = 0; key = 'IA de texto'; }
       else if (p === 'warmup') { local.c = 0; key = 'IA de texto'; }

@@ -15,6 +15,14 @@ import ctypes
 import numpy as np
 import soundfile as sf
 
+# Lab.31: corte por oraciones, uniones y CUDA graphs del predictor (qwen_speed_lab31.py, junto al worker).
+# El Python embebido de Windows no agrega la carpeta del script a sys.path.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    import qwen_speed_lab31 as LAB31
+except Exception:
+    LAB31 = None
+
 ENGINE = sys.argv[1] if len(sys.argv) > 1 else ""
 MODEL = None
 MODEL_DEVICE = ""
@@ -80,7 +88,21 @@ def qwen_runtime_params(params=None):
         "subtalkerTopP": float(params.get("subtalkerTopP") or 0),
         "subtalkerTemperature": float(params.get("subtalkerTemperature") or 0),
         "batchSize": batch_size,
+        "predictorCudaGraphs": bool(params.get("predictorCudaGraphs")),
+        "chunkMode": "sentences" if str(params.get("chunkMode") or "") == "sentences" else "fixed",
+        "minChunkChars": max(120, min(360, int(params.get("minChunkChars") or 200))),
+        "joinPauseMs": max(120, min(600, int(params.get("joinPauseMs") or 300))),
     }
+
+
+def _lab31_graphs(model, params):
+    """Lab.31: activa o desactiva los CUDA graphs del predictor según los parámetros."""
+    if LAB31 is None:
+        return {"enabled": bool((params or {}).get("predictorCudaGraphs")), "active": False, "reason": "falta qwen_speed_lab31.py"}
+    try:
+        return LAB31.apply_predictor_graphs(model, qwen_runtime_params(params)["predictorCudaGraphs"])
+    except Exception as exc:
+        return {"enabled": True, "active": False, "reason": str(exc)[:300]}
 
 
 def qwen_capabilities():
@@ -938,6 +960,7 @@ def generate_qwen_finetuned_batch(texts, params, model_path, speaker):
     import torch
     started = time.perf_counter()
     model = load_model(model_path, qwen_params=params)
+    _lab31_graphs(model, params)
     stable_mode = str(params.get("consistencyMode") or "") == "stable-v1"
     perf = qwen_runtime_params(params)
     configured_temperature = float(params.get("temperature", 0.78))
@@ -1153,6 +1176,7 @@ def generate_piece(text, ref_audio, ref_text, cache_path, style, params, qwen_mo
                 raise RuntimeError("El modelo entrenado no declara un speaker válido")
             import torch
             model = load_model(model_path, qwen_params=params)
+            _lab31_graphs(model, params)
             stable_mode = str(params.get("consistencyMode") or "") == "stable-v1"
             non_streaming = True if perf["nonStreamingMode"] is None else bool(perf["nonStreamingMode"])
             generation = _qwen_generation_options(params, stable_mode, temperature)
@@ -1174,6 +1198,7 @@ def generate_piece(text, ref_audio, ref_text, cache_path, style, params, qwen_mo
         else:
             import torch
             model = load_model(qwen_params=params)
+            _lab31_graphs(model, params)
             stable_mode = str(params.get("consistencyMode") or "automatic") in ("automatic", "stable-v1")
             non_streaming = False if perf["nonStreamingMode"] is None else bool(perf["nonStreamingMode"])
             generation = _qwen_generation_options(params, stable_mode, temperature)
@@ -1256,6 +1281,7 @@ def generate(payload):
     started = time.perf_counter()
     gpu_stop, gpu_thread, gpu_samples = _gpu_sampler(ENGINE == "qwen3tts" and bool(params.get("profileGpu")))
     pieces, sample_rate = [], 0
+    chunk_audios = []
     chunk_diagnostics = []
     piece_stage_diagnostics = []
     setup_ms = round((time.perf_counter() - started) * 1000)
@@ -1265,6 +1291,11 @@ def generate(payload):
         text_chunks = [text]
     elif ENGINE == "qwen3tts" and bool(params.get("batchBenchmarkMode")):
         text_chunks = [part.strip() for part in text.split("|||") if part.strip()]
+    elif (ENGINE == "qwen3tts" and qwen_mode == "finetuned" and LAB31 is not None
+          and qwen_runtime_params(params)["chunkMode"] == "sentences"):
+        # Lab.31: solo fin de oración, fragmentos parejos y, con lotes, tantos como entren en el lote
+        lab31_perf = qwen_runtime_params(params)
+        text_chunks = LAB31.balanced_chunks(text, lab31_perf["chunkChars"], lab31_perf["minChunkChars"], lab31_perf["batchSize"])
     else:
         text_chunks = chunks(text, qwen_runtime_params(params)["chunkChars"] if ENGINE == "qwen3tts" else chatter_chunk)
     request_id = str(payload.get("id") or "")
@@ -1346,6 +1377,7 @@ def generate(payload):
                 if pieces and sr:
                     pieces.append(np.zeros(int(sr * 0.13), dtype=np.float32))
                 pieces.append(audio_item)
+                chunk_audios.append(audio_item)
                 emit({
                     "type": "progress", "id": request_id, "phase": "chunk-done",
                     "chunk": idx + 1, "chunks": len(text_chunks),
@@ -1412,6 +1444,7 @@ def generate(payload):
             if pieces and sr:
                 pieces.append(np.zeros(int(sr * 0.13), dtype=np.float32))
             pieces.append(audio_item)
+            chunk_audios.append(audio_item)
             emit({"type": "progress", "id": request_id, "phase": "chunk-done", "chunk": idx + 1, "chunks": len(text_chunks), "elapsed_ms": chunk_elapsed_ms, "audio_sec": chunk_audio_sec, "seed": active_seed})
 
     if not pieces or not sample_rate:
@@ -1419,7 +1452,13 @@ def generate(payload):
 
     emit({"type": "progress", "id": request_id, "phase": "postprocess", "chunks": len(text_chunks)})
     concat_started = time.perf_counter()
-    audio = np.concatenate(pieces)
+    join_diag = {}
+    if (ENGINE == "qwen3tts" and LAB31 is not None and len(chunk_audios) > 1
+            and qwen_runtime_params(params)["chunkMode"] == "sentences" and qwen_mode == "finetuned"):
+        # Lab.31: uniones cosidas (recorte de silencios, pausa fija, fundido corto, volumen parejo)
+        audio, join_diag = LAB31.join_pieces(chunk_audios, sample_rate, qwen_runtime_params(params)["joinPauseMs"] / 1000.0)
+    else:
+        audio = np.concatenate(pieces)
     concat_ms = round((time.perf_counter() - concat_started) * 1000)
     if not np.isfinite(audio).all():
         raise RuntimeError("Qwen3-TTS produjo muestras de audio no válidas con esta configuración")
@@ -1462,6 +1501,10 @@ def generate(payload):
         "production_temperature": round(float(params.get("productionTemperature", 0.60 if ENGINE == "chatterbox" else params.get("temperature", 0.78))), 3),
         "consistency_mode": str(params.get("consistencyMode") or "automatic"),
         "chunk_diagnostics": chunk_diagnostics,
+        "chunk_mode": qwen_runtime_params(params)["chunkMode"] if ENGINE == "qwen3tts" else "",
+        "chunk_chars": [len(x) for x in text_chunks],
+        "join": join_diag,
+        "predictor_cuda_graphs": (LAB31.predictor_graphs_status(MODEL) if (ENGINE == "qwen3tts" and LAB31 is not None and MODEL is not None) else {}),
         "stage_timings": {
             "setup_ms": setup_ms,
             "pieces": piece_stage_diagnostics,
