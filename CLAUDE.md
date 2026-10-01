@@ -66,7 +66,7 @@ Ver `INTEGRACION_MERLIN.md` (secciones "Diseño en pantalla", "Cámara", "Expres
   - IPC `qwenSpeed:get` / `qwenSpeed:setChunkMode`; panel en `renderer-qwen-speed-lab31.js`.
 - Insignia "SIN OPTIMIZAR" con el fine-tuned: el optimizador guardaba `optimization0321` sin `ttsOptimizationKey` y `releaseV2Lab` lo reemplazaba por la optimización anterior en caché. Ahora la clave se completa antes de guardar.
 
-- Perfil de producción por modelo de voz (`services/releaseV2ProfileByModelLab31.js`, se instala al final): `tts-lab/active-production-profile.json` es uno solo por computadora y atado al modelo; cada perfil válido se archiva por modelo en `tts-lab/production-profiles-by-model.json` y al cargar la configuración con otro modelo se repone el suyo si sigue siendo compatible (misma computadora, runtime y modelo). Así zero-shot y fine-tuned no obligan a reoptimizar al alternar. `optimization-v2:clear` borra también el archivo.
+- Perfil de producción por modelo de voz (`services/releaseV2ProfileByModelLab31.js`, se instala al final): `tts-lab/active-production-profile.json` es uno solo por computadora y atado al modelo; cada perfil válido se archiva por modelo en `tts-lab/production-profiles-by-model.json` y al cargar la configuración con otro modelo se repone el suyo si sigue siendo compatible (misma computadora, runtime y modelo). Así zero-shot y fine-tuned no obligan a reoptimizar al alternar. `optimization-v2:clear` borra también el archivo. La voz de referencia (Qwen zero-shot, Chatterbox) no cuenta como otro modelo: el mismo módulo envuelve `fidelity.compatibility` para ignorarla (clave `qwen3tts:reference:base`, firma del runtime sin `reference=`).
 
 ## Pendiente
 
