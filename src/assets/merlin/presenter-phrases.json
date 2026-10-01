@@ -1,5 +1,5 @@
 {
-  "_nota": "Frases fijas de Merlín. Rotan al azar sin repetir la última. Se pueden editar; al cambiar un texto, su audio se vuelve a generar con la voz configurada.",
+  "_nota": "Frases fijas de Merlín. Rotan al azar sin repetir la última. Se pueden editar; al cambiar un texto, su audio se vuelve a generar con la voz configurada. 'titulares_intro' abre el segmento de titulares (seguido de los titulares reales de la cola).",
   "intro": [
     "Hola, soy Merlín y te acompaño con las noticias de El Comercio. Empezamos.",
     "Bienvenidos. Soy Merlín y estas son las noticias más importantes del momento.",
@@ -26,5 +26,10 @@
     "Aquí terminamos. Gracias por estar con nosotros, nos vemos pronto.",
     "Hasta aquí las noticias. Soy Merlín y te espero en la próxima edición.",
     "Gracias por acompañarnos. Me despido, hasta pronto."
+  ],
+  "titulares_intro": [
+    "Estos son los titulares de esta hora.",
+    "Repasamos lo más importante del momento.",
+    "Te cuento los titulares de esta hora."
   ]
 }

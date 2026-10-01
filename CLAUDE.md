@@ -1,3 +1,5 @@
+Responde siempre en español.
+
 # GEC Automatic News (V2.0 TTS Lab)
 
 App de escritorio Electron (Windows, portable) que arma una emisión automática de noticias: lee RSS, extrae la nota y su imagen, una IA local escribe titular, bajada y guion, un TTS local genera la voz, y la ventana de salida lo emite. Hay también enlatados (videos) y anuncios. La interfaz y los mensajes están en español.
@@ -34,10 +36,14 @@ Ver `INTEGRACION_MERLIN.md`. Resumen:
 
 ## Intervenciones de Merlín (hechas)
 
-- Solo en modo Merlín y emisión automática: `intro` (primera pieza, plano general), `pase` (enlatado o anuncio tras una noticia, primer plano), `regreso` (primera noticia tras enlatado o anuncio, plano general) y `despedida` (al Detener emisión, primer plano; con una noticia al aire, espera a que termine).
-- Frases fijas editables en `src/assets/merlin/presenter-phrases.json`; audio con `kokoro.generate` cacheado en `data/presenter-voice/` (voz + texto). Si no hay audio listo, la intervención se salta.
-- Implementado con `presenterHost` (final de `src/main.js`) + `ECAPI.presenterHostPlayback`. La salida de Merlín también muestra el video de espera (`design.standbyVideoUrl`) al abrir y tras `stop`.
+Presentación, pase a corte, regreso y despedida con frases fijas (`src/assets/merlin/presenter-phrases.json`), audio generado con el TTS local y cacheado en `data/presenter-voice/`. Lógica en `presenterHost` (final de `src/main.js`); la salida maneja `p.kind === 'host'` y avisa el fin con `ECAPI.presenterHostPlayback`. En la salida clásica se omiten. Ver `INTEGRACION_MERLIN.md`.
+
+## Merlín: subtítulos, cintillo, reloj, cámara, expresión, volumen y titulares (hechos)
+
+Ver `INTEGRACION_MERLIN.md` (secciones "Diseño en pantalla", "Cámara", "Expresión", "Volumen normalizado" y "Titulares periódicos"). Opciones nuevas en `presenter-config.js`: `subtitulos`, `reloj`, `titulares`, `volumen`, `expresion`, `camaras.planoMedioCentradoAuto`.
+
+- Tono (`p.tone`): lo devuelve la IA editorial (`editorial.js`) y se agrega a todos los payloads de noticia. Volumen de enlatados y anuncios: `renderer-media-loudness.js` mide con Web Audio, `services/mediaLoudnessMerlin.js` guarda en `data/media-loudness.json` y `main.js` agrega `p.audioGainDb` al payload `kind:'canned'`.
 
 ## Pendiente
 
-- Integrar en modo Merlín la promo de YouTube y el envío por NDI.
+- Integrar en modo Merlín la promo de YouTube y el envío por NDI, que hoy solo están en la salida clásica.

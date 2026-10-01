@@ -59,23 +59,51 @@ Modificados:
 
 ## Video de espera
 
-Igual que la salida clásica (`output-0331.js`): al abrir la salida y después de `stop` se muestra el video de espera configurado en EC1 (`design.standbyVideoUrl`), con la música si está activada (`musicEnabled`, `musicUrl`). Se oculta en cuanto llega una pieza.
+Igual que la salida clásica: al abrir la salida y al detener la emisión se ve el video de espera configurado (con su música si está activada). Al llegar la primera pieza, se desvanece y aparece Merlín.
 
 ## Intervenciones de Merlín
 
-Solo en modo Merlín y con la emisión automática; la salida clásica no las recibe. Merlín habla con frases fijas, sin imagen ni zócalos:
+Solo en modo Merlín y en la emisión automática (en la salida clásica se omiten):
 
 | Momento | Segmento | Plano |
 |---|---|---|
-| Primera pieza de la emisión | `intro` | General |
-| Enlatado o anuncio que sigue a una noticia | `pase` | Primer plano |
-| Primera noticia después de un enlatado o anuncio | `regreso` | General; luego la noticia pasa directo a plano medio |
-| Al pulsar Detener emisión | `despedida` | Primer plano; luego `stop` y video de espera |
+| Primera pieza de la emisión | `intro` (presentación) | General |
+| Antes de un enlatado o anuncio que sigue a una noticia | `pase` | Primer plano |
+| Primera noticia después de un enlatado o anuncio | `regreso` | General |
+| Al pulsar Detener emisión | `despedida` | Primer plano, luego video de espera |
 
-**Detener emisión:** si hay una noticia al aire, no se corta: el motor deja de enviar piezas, la noticia termina, Merlín se despide y recién entonces se envía `stop`. El panel muestra "Deteniendo: Merlín termina la noticia actual y se despide." (tope de 5 minutos). Si hay un enlatado, un anuncio o una intervención en curso, se corta y se despide de inmediato. Si la emisión se reanuda antes de que termine la noticia, la despedida se cancela.
+**Detener emisión en modo Merlín:** si hay una noticia al aire, Merlín la termina de contar, se despide y pasa al video de espera (el panel avisa "Deteniendo…"; tope de espera de 5 minutos). Si hay un enlatado o anuncio, se corta y se despide de inmediato. Si se reanuda la emisión antes de que termine la noticia, la despedida se cancela.
 
-**Frases:** están en `src/assets/merlin/presenter-phrases.json` y se pueden editar. Rotan al azar sin repetir la última.
+- Las frases son fijas y rotan al azar sin repetir la última: `src/assets/merlin/presenter-phrases.json` (se pueden editar).
+- Su audio se genera una sola vez con la voz configurada en EC1 y queda en caché en `data/presenter-voice/`. Si cambias la voz o el texto, se regenera solo. La generación empieza al activar el modo Merlín y unos segundos después de abrir la app.
+- Si el audio de una frase aún no está listo, esa intervención se salta para no frenar la emisión.
+- Implementación: `presenterHost` al final de `src/main.js` envuelve `deliverToOutput` y `controlOutput`; la salida responde con `ECAPI.presenterHostPlayback` (no con `outputPlayback`, para no interferir con el motor de automatización).
 
-**Voz:** el audio de cada frase se genera una sola vez con `kokoro.generate` (la misma voz que las noticias) y se guarda en `data/presenter-voice/`, con un nombre que depende de la voz y del texto. Al cambiar un texto o la voz, se genera de nuevo. Se pregenera al activar el modo Merlín y al arrancar la app en ese modo. Si una frase todavía no tiene audio, esa intervención se salta.
+## Diseño en pantalla (versión con subtítulos)
 
-**Implementación:** `presenterHost` al final de `src/main.js` envuelve `deliverToOutput` y `controlOutput` y envía piezas `kind: 'host'` con `segment`. La salida avisa el fin de cada intervención con `ECAPI.presenterHostPlayback` (IPC `presenter:hostPlayback`), aparte de `outputPlayback`, así el motor de automatización no cambia. Si no llega el aviso, un temporizador sigue con la emisión.
+- **Cintillo unificado** en plano medio y pantalla completa: pestaña con sección y exclusivo (colores, opacidad, borde, radio, tipografía, tamaño, peso, texto y visibilidad de **Diseño** de EC1) y titular centrado de dos renglones. En pantalla completa ya no se muestra la bajada.
+- **Subtítulos**: caja propia, centrada, encima del cintillo; texto exacto del guion (`p.script`, o `hostText` en las intervenciones) con tiempos estimados por largo de frase y resaltado de las palabras ya dichas. Se activan con `subtitulos.activos` en `presenter-config.js`.
+- **Recuadro de la imagen**: respeta la posición configurada y sube lo justo si hay subtítulos, sin tocar el reloj.
+- **Plano medio**: la cámara centra a Merlín en el espacio libre a la izquierda del recuadro (`camaras.planoMedioCentradoAuto`).
+- **Reloj** arriba a la derecha (hora de la PC, formato `8:45 PM`); se oculta en enlatados, anuncios y espera (`reloj.activo`, `reloj.posicion`).
+- **Imágenes**: mismo movimiento que la salida clásica, según **Diseño → Animación** y **Velocidad**.
+
+## Cámara
+
+- Solo cortes de plano a plano: sin acercamiento lento ni deslizamientos.
+- Si hay que cambiar de plano y la pantalla está cubierta (pantalla completa, enlatado, espera), el corte se hace cuando la cobertura ya es opaca y recién después se destapa.
+- Entre noticias consecutivas en el mismo plano (incluida la **Pausa entre noticias** de EC1) la cámara no se mueve y el cintillo cambia el texto con un fundido corto.
+
+## Expresión según el tono
+
+La IA editorial devuelve `tone` en su JSON (`src/services/editorial.js`; cualquier otro valor o su ausencia queda en `neutral`), se guarda en `item.result.tone` y viaja a la salida como `p.tone` en todos los payloads de noticia. La salida clásica lo ignora.
+
+`p.tone` (`serio` | `neutral` | `ligero`) ajusta balanceo de cabeza, gestos de alas, parpadeo, párpados y miradas. Si el modelo trae los huesos `CEJA_L` y `CEJA_R`, también mueve las cejas (`expresion.cejas.eje` y `amplitud`); si no, se ignoran.
+
+## Volumen normalizado
+
+`presenterHost` mide el nivel de cada voz (WAV del TTS: noticias, intervenciones y titulares) y envía `p.audioGainDb` para llevarlo a `volumen.objetivoDb` (por defecto −20 dBFS RMS, ajuste entre −12 y +6 dB). La salida lo aplica al volumen del elemento (tope 100 %). Enlatados y anuncios: el panel de control (`src/renderer-media-loudness.js`) mide en segundo plano cada video de las carpetas de enlatados y anuncios con Web Audio (RMS en bloques de 50 ms, ignorando los de menos de −40 dBFS; objetivo −20 dBFS, ajuste entre −12 y +6 dB). La medición se guarda en `data/media-loudness.json` por ruta, tamaño y fecha (si el archivo cambia, se vuelve a medir) y `main.js` la agrega como `p.audioGainDb` al payload `kind:'canned'`. Si un video no se puede decodificar o supera 300 MB, no se envía el campo (0 dB).
+
+## Titulares periódicos
+
+Cada `titulares.cadaMinutos` (25 por defecto), antes de una noticia, Merlín dice una entrada fija (`titulares_intro` en `presenter-phrases.json`) y los titulares reales de las próximas `titulares.cantidad` noticias listas de la cola; cada titular aparece a pantalla completa con su imagen y el cintillo, sincronizado con `headlineMarks`. El audio se prepara unos 90 s antes; si no está listo, se salta y se intenta en la siguiente noticia. `presenterHost.titularesNow()` los fuerza en la próxima noticia.

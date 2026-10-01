@@ -26,17 +26,24 @@ body{user-select:none}
 
 /* recuadro del plano medio */
 .ots{position:absolute;left:5%;top:6%;width:40%;aspect-ratio:16/9;border-radius:10px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.45),0 0 0 3px rgba(255,248,238,.9);
-  opacity:0;transform:translateX(30px) scale(.97);transition:opacity .45s ease,transform .45s ease,left .3s ease,width .3s ease;pointer-events:none}
+  opacity:0;transform:translateX(30px) scale(.97);transition:opacity .45s ease,transform .45s ease;pointer-events:none}
 .ots.on{opacity:1;transform:none}
 .otsImg,.otsImg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.otsImg img{transition:transform 0s linear .7s}
-.ots.on .otsImg img{transform:scale(1.07);transition:transform 14s linear}
 
 /* pantalla completa: réplica del bloque inferior de output.css / output-0324.css */
 .full{position:absolute;inset:0;overflow:hidden;opacity:0;transition:opacity .5s ease;pointer-events:none;background:#000}
 .full.on{opacity:1}
-.full>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:transform 0s linear .7s}
-.full.on>img{transform:scale(1.08);transition:transform 16s linear}
+.full>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+/* movimiento de imagen: mismo que la salida clásica (output.css), según Diseño → animación y velocidad de EC1 */
+#stage{--motion-duration:18s}
+.motion-vertical{animation:vertical var(--motion-duration) ease-in-out infinite alternate}
+.motion-horizontal{animation:horizontal var(--motion-duration) ease-in-out infinite alternate}
+.motion-zoom{animation:zoom var(--motion-duration) ease-in-out infinite alternate}
+.motion-none{animation:none;transform:scale(1.04)}
+@keyframes vertical{from{transform:scale(1.13) translateY(-5%)}to{transform:scale(1.13) translateY(5%)}}
+@keyframes horizontal{from{transform:scale(1.13) translateX(-5%)}to{transform:scale(1.13) translateX(5%)}}
+@keyframes zoom{from{transform:scale(1.03)}to{transform:scale(1.11)}}
+.paused-motion .otsImg img,.paused-motion .full>img{animation-play-state:paused}
 .ecShade{position:absolute;inset:0;background:linear-gradient(transparent 42%,var(--ec-lower-bg) 100%)}
 .ecLower{position:absolute;left:64px;right:64px;bottom:54px;max-height:72%;overflow:hidden;color:var(--ec-title)}
 .ecMeta{display:flex;align-items:center;gap:22px;margin-bottom:15px}
@@ -49,12 +56,29 @@ body{user-select:none}
 .ecSummary{font-family:var(--ec-summary-font);font-size:var(--ec-summary-size);line-height:1.24;margin-top:14px;max-width:1500px;color:var(--ec-summary);font-weight:var(--ec-summary-weight)}
 .ecSummary:empty{display:none}
 
-/* cintillo del plano medio: solo el titular, 90% del ancho, alto fijo de 2 renglones */
-.lower{position:absolute;left:5%;right:5%;bottom:6%;background:var(--ec-lower-bg);color:var(--ec-title);font-family:var(--ec-font);
-  padding:28px 48px;border-left:10px solid var(--ec-cat-bg);display:flex;align-items:center;min-height:164px;
-  opacity:0;transform:translateY(12px);transition:opacity .4s ease,transform .4s ease;pointer-events:none}
+/* cintillo unificado (plano medio y pantalla completa): sección + exclusivo + titular centrado */
+.lower{position:absolute;left:8%;right:8%;bottom:4.5%;color:var(--ec-title);font-family:var(--ec-font);padding:0 56px 26px;
+  background:linear-gradient(180deg,rgba(10,10,12,.92),rgba(10,10,12,.86));border-top:6px solid var(--ec-cat-bg);box-shadow:0 10px 30px rgba(0,0,0,.35);
+  display:flex;flex-direction:column;align-items:center;opacity:0;transform:translateY(12px);transition:opacity .4s ease,transform .4s ease;pointer-events:none;z-index:2}
 .lower.on{opacity:1;transform:none}
-.lower b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:50px;line-height:1.08;font-weight:900}
+.lowerMeta{display:flex;gap:10px;justify-content:center;transform:translateY(-50%);margin-bottom:-4px;min-height:24px}
+/* sección y exclusivo: colores, opacidad, borde, radio, tipografía, tamaño, peso, texto y visibilidad vienen de Diseño de EC1 */
+.lCat{background:var(--l-cat-bg,#F7C600);color:var(--ec-cat);font-family:var(--ec-cat-font);font-size:var(--l-cat-size,24px);font-weight:var(--ec-cat-weight);border-radius:var(--l-cat-radius,0);line-height:1;padding:.375em .66em;letter-spacing:.04em;text-transform:uppercase}
+.lCat:empty{display:none}
+.lExcl{display:none;background:var(--l-excl-bg,#F7C600);color:var(--ec-excl-color);border:var(--l-excl-border-w,0) solid var(--l-excl-border,#F7C600);border-radius:var(--ec-excl-radius);font-family:var(--ec-excl-font);font-size:var(--l-excl-size,22px);font-weight:var(--ec-excl-weight);line-height:1;padding:.41em .64em;white-space:nowrap}
+.lExcl.show{display:inline-block}
+.lower b{display:flex;align-items:center;justify-content:center;min-height:2.24em;font-size:48px;line-height:1.12;font-weight:var(--ec-title-weight);width:100%}
+.lower b span,.lowerMeta{transition:opacity .22s ease}
+.lower.swap b span,.lower.swap .lowerMeta{opacity:0}
+.lower b span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-align:center}
+/* subtítulos: caja propia, centrada, encima del cintillo */
+.subs{position:absolute;left:50%;bottom:7%;transform:translateX(-50%);max-width:64%;text-align:center;font-family:var(--ec-font);font-size:36px;font-weight:700;line-height:1.3;color:#fff;
+  background:rgba(0,0,0,.66);padding:8px 24px;border-radius:6px;opacity:0;transition:opacity .25s ease;pointer-events:none;z-index:2}
+.subs.on{opacity:1}
+.subs .f{color:rgba(255,255,255,.6)}
+/* en pantalla completa se usa el mismo cintillo; el bloque grande con la bajada queda oculto */
+.full .ecLower{display:none}
+.full .ecShade{background:linear-gradient(transparent 55%,rgba(0,0,0,.55) 100%)}
 
 /* enlatados y anuncios */
 .canned{position:absolute;inset:0;background:#000;opacity:0;transition:opacity .7s ease-in-out;pointer-events:none}
@@ -64,4 +88,7 @@ body{user-select:none}
 .standby{position:absolute;inset:0;background:#000;opacity:0;transition:opacity .7s ease-in-out;pointer-events:none;z-index:4}
 .standby.on{opacity:1}
 .standby video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
+.clock{position:absolute;top:4%;right:4%;z-index:3;background:rgba(10,10,12,.82);color:#fff;font-family:var(--ec-font);font-size:38px;font-weight:700;line-height:1;
+  padding:12px 20px 12px 17px;border-left:6px solid var(--ec-cat-bg);letter-spacing:.02em;opacity:0;transition:opacity .4s ease;pointer-events:none;font-variant-numeric:tabular-nums}
+.clock.on{opacity:1}
 .grain{position:absolute;inset:0;pointer-events:none;mix-blend-mode:overlay;background-size:256px 256px;z-index:5}
