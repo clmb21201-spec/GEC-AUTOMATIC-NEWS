@@ -68,6 +68,10 @@ Ver `INTEGRACION_MERLIN.md` (secciones "Diseño en pantalla", "Cámara", "Expres
 
 - Perfil de producción por modelo de voz (`services/releaseV2ProfileByModelLab31.js`, se instala al final): `tts-lab/active-production-profile.json` es uno solo por computadora y atado al modelo; cada perfil válido se archiva por modelo en `tts-lab/production-profiles-by-model.json` y al cargar la configuración con otro modelo se repone el suyo si sigue siendo compatible (misma computadora, runtime y modelo). Así zero-shot y fine-tuned no obligan a reoptimizar al alternar. `optimization-v2:clear` borra también el archivo. La voz de referencia (Qwen zero-shot, Chatterbox) no cuenta como otro modelo: el mismo módulo envuelve `fidelity.compatibility` para ignorarla (clave `qwen3tts:reference:base`, firma del runtime sin `reference=`).
 
+## Lab.32 (lectura de códigos de documentos)
+
+- `services/documentCodesSpeechLab32.js` (se instala al final de `bootstrap-v2lab.js`, envolviendo `PronunciationNormalizer.prototype.normalize`): antes de la pronunciación pasa a palabras los códigos de documentos oficiales. "N° 000081-2026-PE-ONP" → "número ochenta y uno, dos mil veintiséis, pe e, o ene pe": sin ceros a la izquierda, tramos separados por coma, siglas deletreadas salvo las que se dicen como palabra (4+ letras, 2+ vocales: Minsa, Sunat, Onpe). Reconoce N°/Nº/N.º/Nro./Núm./número, "No." con guion, y el tipo de documento (Decreto Supremo, Resolución…, Ley, Expediente, Oficio, D.S., R.M., Exp.…; las abreviaturas se dicen completas). Sin prefijo exige guion o barra. Prueba: `scripts/check-document-codes-lab32.js`.
+
 ## Pendiente
 
 - Integrar en modo Merlín la promo de YouTube y el envío por NDI (hoy NDI queda bloqueado con aviso en modo Merlín).
