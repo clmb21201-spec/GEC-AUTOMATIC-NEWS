@@ -10,10 +10,11 @@
 // documento (Decreto Supremo 004-2025-EF, D.S. 004-2025-EF, Expediente 00123-2023-0-1801-JR-PE-01); sin prefijo
 // se exige al menos un guion o barra para no tocar cifras sueltas. Se instala al final, envolviendo
 // PronunciationNormalizer.prototype.normalize, así que vale para todos los motores de voz y para Merlín.
+const path=require('path');
 const {integerWords}=require('./speechRules0328');
+const acr=require('./acronymsSpeechLab32');
 
 const VERSION='lab32-document-codes-1';
-const LETTERS={A:'a',B:'be',C:'ce',D:'de',E:'e',F:'efe',G:'ge',H:'hache',I:'i',J:'jota',K:'ka',L:'ele',M:'eme',N:'ene','Ñ':'eñe',O:'o',P:'pe',Q:'cu',R:'erre',S:'ese',T:'te',U:'u',V:'ve',W:'doble ve',X:'equis',Y:'ye',Z:'zeta','Á':'a','É':'e','Í':'i','Ó':'o','Ú':'u'};
 const ONSETS=new Set(['bl','br','cl','cr','dr','fl','fr','gl','gr','pl','pr','tr','ch']);
 const VOWELS=/[aeiouáéíóú]/;
 
@@ -26,10 +27,12 @@ function pronounceableAcronym(word){
   if(!VOWELS.test(w[0])&&!VOWELS.test(w[1])&&!ONSETS.has(w.slice(0,2)))return false;
   return true;
 }
-function spellAcronym(word){
+// Dentro de un código: primero el diccionario de siglas (incorporado + panel), después la regla general.
+function spellAcronym(word,dict=acr.BUILTIN){
+  if(Object.prototype.hasOwnProperty.call(dict,word))return dict[word];
   const w=String(word||'').toUpperCase();
   if(pronounceableAcronym(w))return w[0]+w.slice(1).toLowerCase();
-  return [...w].map(ch=>LETTERS[ch]||ch.toLowerCase()).join(' ');
+  return acr.spellLetters(w);
 }
 function numberSegment(digits){
   const clean=String(digits||'').replace(/^0+(?=\d)/,'');
@@ -37,8 +40,8 @@ function numberSegment(digits){
   return integerWords(Number(clean));
 }
 // "000081-2026-PE-ONP" → "ochenta y uno, dos mil veintiséis, pe e, o ene pe"
-function speakCode(code){
-  return String(code||'').split(/\s*[-–‑/]\s*/).filter(Boolean).map(seg=>/^\d+$/.test(seg)?numberSegment(seg):spellAcronym(seg)).join(', ');
+function speakCode(code,dict=acr.BUILTIN){
+  return String(code||'').split(/\s*[-–‑/]\s*/).filter(Boolean).map(seg=>/^\d+$/.test(seg)?numberSegment(seg):spellAcronym(seg,dict)).join(', ');
 }
 
 const SEG=String.raw`(?:\d{1,12}|[A-ZÁÉÍÓÚÑ]{1,12}(?![\p{Ll}\p{N}]))`;
@@ -58,28 +61,45 @@ const DOC_ABBR=[[/^D\.\s?S\.$/,'Decreto Supremo'],[/^D\.\s?U\.$/,'Decreto de Urg
 function docName(doc){for(const [rx,name] of DOC_ABBR)if(rx.test(doc))return name;return doc;}
 const ABBR_RX=new RegExp(String.raw`(?<![\p{L}\p{N}])(D\.\s?S\.|D\.\s?U\.|D\.\s?Leg\.|D\.\s?L\.|R\.\s?M\.|R\.\s?S\.|R\.\s?D\.|R\.\s?J\.|R\.\s?A\.|Exp\.)(?=\s*(?:${MARKER}\s*)?\d)`,'gu');
 
-function speakDocumentCodes(input){
+function speakDocumentCodes(input,dict=acr.BUILTIN){
   let text=String(input??''),count=0;
-  const marker=(_,code)=>{count++;return `número ${speakCode(code)}`;};
+  const marker=(_,code)=>{count++;return `número ${speakCode(code,dict)}`;};
   text=text.replace(ABBR_RX,doc=>docName(doc));
   text=text.replace(MARKER_RX,marker).replace(NO_RX,marker);
-  text=text.replace(DOC_RX,(_,doc,code)=>{count++;return `${docName(doc)} ${speakCode(code)}`;});
+  text=text.replace(DOC_RX,(_,doc,code)=>{count++;return `${docName(doc)} ${speakCode(code,dict)}`;});
   return{text,count};
 }
 
-function installDocumentCodesSpeechLab32(){
+// Códigos y siglas antes de la pronunciación. La lista del panel vive en la carpeta de datos de la voz.
+function speakForTts(input,userTerms={}){
+  const dict=acr.dictionary(userTerms),codes=speakDocumentCodes(input,dict),acronyms=acr.speakAcronyms(codes.text,dict);
+  return{text:acronyms.text,codes:codes.count,acronyms:acronyms.count};
+}
+function acronymsFile(dataDir){return path.join(dataDir,acr.FILE_NAME);}
+
+function installDocumentCodesSpeechLab32({dataRoot}={}){
   const {PronunciationNormalizer}=require('./pronunciation');
   const proto=PronunciationNormalizer.prototype;
   if(proto.__ecLab32DocumentCodes)return;
   Object.defineProperty(proto,'__ecLab32DocumentCodes',{value:true});
+  const rootOf=self=>{try{return typeof dataRoot==='function'?dataRoot():(self?.dataDir||'');}catch{return self?.dataDir||'';}};
   const base=proto.normalize;
   proto.normalize=async function(script,options={}){
-    let spoken=String(script??''),count=0;
-    try{({text:spoken,count}=speakDocumentCodes(spoken));}catch{spoken=String(script??'');count=0;}
+    let spoken=String(script??''),r={codes:0,acronyms:0};
+    try{const root=rootOf(this);r=speakForTts(spoken,root?acr.readUserAcronyms(acronymsFile(root)):{});spoken=r.text;}catch{spoken=String(script??'');r={codes:0,acronyms:0};}
     const out=await base.call(this,spoken,options);
-    if(!count||!out||typeof out!=='object')return out;
-    return{...out,speechTransforms:[...new Set([...(out.speechTransforms||[]),'códigos de documento'])],documentCodesVersion:VERSION};
+    if(!(r.codes||r.acronyms)||!out||typeof out!=='object')return out;
+    const extra=[...(r.codes?['códigos de documento']:[]),...(r.acronyms?['siglas']:[])];
+    return{...out,speechTransforms:[...new Set([...(out.speechTransforms||[]),...extra])],documentCodesVersion:VERSION};
   };
+  let ipcMain=null;try{({ipcMain}=require('electron'));}catch{}
+  if(!ipcMain||typeof ipcMain.handle!=='function')return;
+  const file=()=>{const root=rootOf(null);if(!root)throw new Error('Carpeta de datos no disponible');return acronymsFile(root);};
+  const view=()=>({ok:true,terms:acr.readUserAcronyms(file()),builtin:acr.BUILTIN});
+  try{ipcMain.removeHandler('acronyms:get');ipcMain.removeHandler('acronyms:set');ipcMain.removeHandler('acronyms:test');}catch{}
+  ipcMain.handle('acronyms:get',()=>{try{return view();}catch(e){return{ok:false,error:e.message||String(e)};}});
+  ipcMain.handle('acronyms:set',(_e,terms={})=>{try{acr.writeUserAcronyms(file(),terms);return view();}catch(e){return{ok:false,error:e.message||String(e)};}});
+  ipcMain.handle('acronyms:test',(_e,text='')=>{try{return{ok:true,text:speakForTts(String(text||'').slice(0,2000),acr.readUserAcronyms(file())).text};}catch(e){return{ok:false,error:e.message||String(e)};}});
 }
 
-module.exports={VERSION,speakDocumentCodes,speakCode,spellAcronym,pronounceableAcronym,installDocumentCodesSpeechLab32};
+module.exports={VERSION,speakDocumentCodes,speakCode,spellAcronym,pronounceableAcronym,speakForTts,acronymsFile,installDocumentCodesSpeechLab32};
