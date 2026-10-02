@@ -73,6 +73,10 @@ Ver `INTEGRACION_MERLIN.md` (secciones "Diseño en pantalla", "Cámara", "Expres
 - `services/documentCodesSpeechLab32.js` (se instala al final de `bootstrap-v2lab.js`, envolviendo `PronunciationNormalizer.prototype.normalize`): antes de la pronunciación pasa a palabras los códigos de documentos oficiales. "N° 000081-2026-PE-ONP" → "número ochenta y uno, dos mil veintiséis, pe e, o ene pe": sin ceros a la izquierda, tramos separados por coma, siglas deletreadas salvo las que se dicen como palabra (4+ letras, 2+ vocales: Minsa, Sunat, Onpe). Reconoce N°/Nº/N.º/Nro./Núm./número, "No." con guion, y el tipo de documento (Decreto Supremo, Resolución…, Ley, Expediente, Oficio, D.S., R.M., Exp.…; las abreviaturas se dicen completas). Sin prefijo exige guion o barra. Prueba: `scripts/check-document-codes-lab32.js`.
 - Siglas sueltas (`services/acronymsSpeechLab32.js`, aplicado en el mismo envoltorio): diccionario incorporado de prensa peruana (TV → "tevé", ONP → "o ene pe", ONPE → "Onpe", MINSA → "Minsa"…) más las del operador, que ganan. Las desconocidas sin vocales se deletrean (salvo números romanos); las demás siguen el camino de siempre. Panel: tarjeta "Siglas" bajo "Aprendizaje guardado" (`renderer-acronyms-lab32.js`, IPC `acronyms:get|set|test`), guardadas en `pronunciation-acronyms.json` en la carpeta de datos (`dataRoot()` de Lab.29).
 
+## Promo de YouTube en Merlín
+
+- `output-merlin.html` y `output-merlin-web.html` cargan los mismos archivos de la promo que la clásica (`output-youtube-promo*.js|css`, `output-stabilization-lab28.css`); el recuadro se monta sobre `#stage` y usa `#cannedVideo`. Antes solo se inyectaba en `output.html` y en Merlín nunca aparecía. `outputLanServer.js` sirve esos archivos. Prueba: `scripts/check-merlin-youtube-promo.js`.
+
 ## Pendiente
 
-- Integrar en modo Merlín la promo de YouTube y el envío por NDI (hoy NDI queda bloqueado con aviso en modo Merlín).
+- Integrar en modo Merlín el envío por NDI (hoy NDI queda bloqueado con aviso en modo Merlín).
