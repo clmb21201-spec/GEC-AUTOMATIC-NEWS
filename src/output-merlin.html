@@ -5,24 +5,23 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>EC Automatic News — OUTPUT</title>
   <link rel="stylesheet" href="output-merlin.css">
-  <!-- Promo de YouTube en contenidos vinculados (mismos archivos que la salida clásica) -->
-  <link rel="stylesheet" href="output-youtube-promo.css">
-  <link rel="stylesheet" href="output-youtube-promo-v2-lab29.css">
-  <link rel="stylesheet" href="output-stabilization-lab28.css">
 </head>
 <body>
 <div id="viewport">
   <div id="dragRegion" aria-hidden="true"></div>
   <div id="stage">
     <div class="set" id="set">
-      <div class="view" id="viewBack">
+      <!-- capas del set con profundidad distinta (parallax): fondo, silla, [Merlín 3D], mesa, objetos -->
+      <div class="view" id="lyBg">
         <img id="bg" alt="" src="assets/merlin/fondo.jpg">
         <div class="plane" id="framePlane"><img alt=""><i class="glare paper"></i></div>
-        <img id="chair" alt="" src="assets/merlin/silla.webp" style="transform-origin:52.86% 11.51%">
       </div>
-      <div class="view" id="viewFront">
+      <div class="view" id="lyChair"><img id="chair" alt="" src="assets/merlin/silla.webp" style="transform-origin:52.86% 11.51%"></div>
+      <div class="view" id="lyDesk">
         <img id="desk" alt="" src="assets/merlin/mesa.webp">
         <div class="plane" id="tabPlane"><img alt=""><i class="glare"></i></div>
+      </div>
+      <div class="view" id="lyProps">
         <img id="mic" alt="" src="assets/merlin/mic.webp" style="transform-origin:12.5% 70%">
         <img id="cups" alt="" src="assets/merlin/vasos.webp" style="transform-origin:49.9% 79.3%">
       </div>
@@ -47,7 +46,5 @@
 <script src="assets/merlin/merlin-model.js"></script>
 <script src="assets/merlin/presenter-config.js"></script>
 <script src="output-merlin.js"></script>
-<script src="output-youtube-promo.js"></script>
-<script src="output-youtube-promo-v2-lab29.js"></script>
 </body>
 </html>

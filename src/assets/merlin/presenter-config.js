@@ -1,6 +1,6 @@
 'use strict';
 // Configuración del presentador Merlín (exportada desde la página "Merlín en el set" y ampliada).
-// Si vuelves a pegar el texto de "Valores para Claude Code", conserva las secciones subtitulos, reloj, titulares, volumen y expresion.
+// Si vuelves a pegar el texto de "Valores para Claude Code", conserva las secciones subtitulos, reloj, titulares, volumen, expresion, gestos y camaras.parallax.
 // Debe quedar: window.MERLIN_CONFIG = { ... };
 window.MERLIN_CONFIG = {
   "modelo": "MERLIN1_CORREGIDO.glb (pesos del pico/ojos en CUERPO pasados a CABEZA)",
@@ -157,7 +157,15 @@ window.MERLIN_CONFIG = {
     "transicion": "smooth",
     "acercamientoLento": "+4% durante el plano",
     "metodo": "CSS transform (translate+scale) en las capas de atrás y de adelante; el 3D usa camera.setViewOffset con el mismo recorte",
-    "planoMedioCentradoAuto": true
+    "planoMedioCentradoAuto": true,
+    "parallax": {
+      "activo": true,
+      "fondo": 0.88,
+      "silla": 0.96,
+      "mesa": 1.04,
+      "objetos": 1.08,
+      "nota": "1 = profundidad de Merlín; menos de 1 se mueve menos (más lejos), más de 1 se mueve más (más cerca)"
+    }
   },
   "imagenApoyo": {
     "cuadroPared": {
@@ -355,8 +363,38 @@ window.MERLIN_CONFIG = {
   "expresion": {
     "cejas": {
       "eje": "x",
-      "amplitud": 12,
-      "nota": "solo si el modelo trae los huesos CEJA_L y CEJA_R"
+      "amplitud": -18,
+      "nota": "en este rig, girar CEJA en X negativo levanta la ceja; por eso la amplitud es negativa"
+    }
+  },
+  "gestos": {
+    "saludo": {
+      "activo": true,
+      "ala": "L",
+      "nota": "saluda con el ala al presentarse y al despedirse; R = ala del lado derecho de la pantalla, L = la otra",
+      "poses": {
+        "arriba": {
+          "x": -76,
+          "y": -81,
+          "z": 110
+        },
+        "a": {
+          "x": -76,
+          "y": -81,
+          "z": 110
+        },
+        "b": {
+          "x": -125,
+          "y": -71,
+          "z": 110
+        },
+        "plumas": {
+          "abanico": 9,
+          "ondeo": 9
+        },
+        "ciclos": 3,
+        "velocidad": 1.5
+      }
     }
   }
 };

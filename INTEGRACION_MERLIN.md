@@ -32,14 +32,6 @@ Colores, tipografías (incluidas las importadas), tamaños y pesos del titular, 
 
 Opcional: `camaras.generalAlVolverSeg` (segundos de plano general al volver de una pausa, por defecto 4).
 
-## Vista previa en Diseño
-
-Con el modo Merlín y formato 16:9, la **Vista previa de emisión** de la pestaña Emisión muestra la salida real de Merlín (plano general y luego plano medio con el cintillo) con el diseño guardado y la nota de ejemplo. Es muda y solo se carga mientras está en pantalla, para no ocupar la GPU. Si el 3D no carga, queda la vista previa clásica con un aviso.
-
-## NDI
-
-NDI solo está disponible en la vista clásica: la ventana NDI usa la salida clásica. Con el modo Merlín, NDI se detiene, la tarjeta queda deshabilitada y muestra el aviso; al volver a la clásica se reanuda si estaba activado. En 9:16 la salida siempre es la clásica y NDI funciona normalmente.
-
 ## Salida por red local (OBS)
 
 Con la salida LAN activada, Merlín está en `http://IP-DEL-PC:PUERTO/merlin?k=CLAVE` (misma IP, puerto y clave que la salida web actual). En OBS: fuente de navegador de 1920×1080 con "Controlar audio mediante OBS".
@@ -104,14 +96,23 @@ Solo en modo Merlín y en la emisión automática (en la salida clásica se omit
 
 ## Expresión según el tono
 
-La IA editorial devuelve `tone` en su JSON (`src/services/editorial.js`; cualquier otro valor o su ausencia queda en `neutral`), se guarda en `item.result.tone` y viaja a la salida como `p.tone` en todos los payloads de noticia. La salida clásica lo ignora.
-
 `p.tone` (`serio` | `neutral` | `ligero`) ajusta balanceo de cabeza, gestos de alas, parpadeo, párpados y miradas. Si el modelo trae los huesos `CEJA_L` y `CEJA_R`, también mueve las cejas (`expresion.cejas.eje` y `amplitud`); si no, se ignoran.
 
 ## Volumen normalizado
 
-`presenterHost` mide el nivel de cada voz (WAV del TTS: noticias, intervenciones y titulares) y envía `p.audioGainDb` para llevarlo a `volumen.objetivoDb` (por defecto −20 dBFS RMS, ajuste entre −12 y +6 dB). La salida lo aplica al volumen del elemento (tope 100 %). Enlatados y anuncios: el panel de control (`src/renderer-media-loudness.js`) mide en segundo plano cada video de las carpetas de enlatados y anuncios con Web Audio (RMS en bloques de 50 ms, ignorando los de menos de −40 dBFS; objetivo −20 dBFS, ajuste entre −12 y +6 dB). La medición se guarda en `data/media-loudness.json` por ruta, tamaño y fecha (si el archivo cambia, se vuelve a medir) y `main.js` la agrega como `p.audioGainDb` al payload `kind:'canned'`. Si un video no se puede decodificar o supera 300 MB, no se envía el campo (0 dB).
+`presenterHost` mide el nivel de cada voz (WAV del TTS: noticias, intervenciones y titulares) y envía `p.audioGainDb` para llevarlo a `volumen.objetivoDb` (por defecto −20 dBFS RMS, ajuste entre −12 y +6 dB). La salida lo aplica al volumen del elemento (tope 100 %). Enlatados y anuncios también usan `p.audioGainDb` si EC1 lo envía.
 
 ## Titulares periódicos
 
 Cada `titulares.cadaMinutos` (25 por defecto), antes de una noticia, Merlín dice una entrada fija (`titulares_intro` en `presenter-phrases.json`) y los titulares reales de las próximas `titulares.cantidad` noticias listas de la cola; cada titular aparece a pantalla completa con su imagen y el cintillo, sincronizado con `headlineMarks`. El audio se prepara unos 90 s antes; si no está listo, se salta y se intenta en la siguiente noticia. `presenterHost.titularesNow()` los fuerza en la próxima noticia.
+
+## Modelo y animación (versión con rig ampliado)
+
+- **Modelo:** `src/assets/merlin/merlin-model.js` incrusta el GLB con una sola textura horneada (oclusión "solo local" incluida) y el rig ampliado: `PECHO` (las alas cuelgan de él), cejas `CEJA_L/R` con malla propia, sombrero articulado (`SOMBRERO_BASE → COPA_1 → COPA_2 → PUNTA`, más `SOMBRERO_ALA → ALA_1`), cinco plumas articuladas por ala (`DEDO_k_s_L/R`) e `INSIGNIA` (anclaje en el pecho, hija de `PECHO`). Los huesos que falten en un modelo se ignoran.
+- **Nombres repetidos:** GLTFLoader renombra los nodos duplicados (la malla y el hueso `CEJA_L`, `OJO_L`…); la salida busca los huesos por su nombre original (`userData.name`).
+- **Párpados:** comparten el material `PICO`; la salida les asigna un material propio de color sólido (`apariencia.colorParpados`, `#c45e00`) porque la textura tenía una mancha oscura en esa zona.
+- **Vida:** ruido suave en vez de ondas, resortes con inercia y rebote amortiguado, asentimientos ocasionales en los acentos, respiración repartida entre `COLUMNA` y `PECHO`, leve inclinación hacia el micrófono al hablar, microsacadas y parpadeos dobles, y en la pausa entre noticias mira la tablet y vuelve a cámara con un parpadeo.
+- **Cejas:** suben y bajan desplazándose (`expresion.cejas.levantar`) con un giro leve; acompañan énfasis, preguntas y tono, y se fruncen un poco al mirar la tablet.
+- **Sombrero y plumas:** la copa, la punta y el ala del sombrero siguen a la cabeza con retraso; las plumas se curvan, se arrastran al mover el ala y ondulan levemente.
+- **Saludo:** en la presentación y la despedida, el ala configurada (`gestos.saludo.ala`) pasa por las poses `arriba`, `a` y `b` (`gestos.saludo.poses`, posadas con la herramienta "Merlín · posar el saludo"), con la palma hacia la cámara.
+- **Parallax:** el set está en capas (`#lyBg`, `#lyChair`, `#lyDesk`, `#lyProps`) que se mueven distinto según su profundidad (`camaras.parallax`).

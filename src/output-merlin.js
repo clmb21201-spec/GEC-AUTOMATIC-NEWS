@@ -8,7 +8,7 @@
 (function(){
 const $ = id => document.getElementById(id);
 const CFG = window.MERLIN_CONFIG || {};
-const get = (path, def) => { let o = CFG; for (const k of path.split('.')) { if (o == null || !(k in o)) return def; o = o[k]; } return o == null ? def : o; };
+const get = (path, def) => { let o = CFG; for (const k of path.split('.')) { if (o == null || typeof o !== 'object' || !(k in o)) return def; o = o[k]; } return o == null ? def : o; };
 const num = (path, def) => { const v = Number(get(path, def)); return Number.isFinite(v) ? v : def; };
 const log = (...a) => { try { console.log('[merlin]', ...a); } catch {} };
 
@@ -36,16 +36,25 @@ const P = {
   envPhoto:get('integracion.entornoDesdeFoto',true), bounce:num('integracion.reboteMesa.intensidad',0.45), occ:num('integracion.sombraMesa.intensidad',0.35), deskLine:num('integracion.sombraMesa.lineaMesaPantallaY',0.63),
   feather:num('integracion.plumas.intensidad',0.35), whiteTone:num('integracion.blancoCalido',0.05), filter:String(get('integracion.filtroCSS','sepia(0.04) saturate(0.95) contrast(0.97) blur(0.4px)')), grainA:num('integracion.grano',0.16),
   // luz
+  // parallax: cuánto se mueve cada capa respecto de Merlín (1) al acercarse o desplazarse la cámara
+  parallaxOn:get('camaras.parallax.activo',true) !== false, pxBg:num('camaras.parallax.fondo',.88), pxChair:num('camaras.parallax.silla',.96), pxDesk:num('camaras.parallax.mesa',1.04), pxProps:num('camaras.parallax.objetos',1.08),
+  waveOn:get('gestos.saludo.activo',true) !== false, waveSide:String(get('gestos.saludo.ala','R')) === 'L' ? 'L' : 'R',
+  // poses del saludo (rotación local del ala en grados, para el ala derecha; la izquierda usa la versión espejada)
+  // el giro (y) de -140° voltea el ala para que mire a cámara la palma (cara interior) y no el dorso; el vaivén va en x (de lado a lado en pantalla)
+  wavePoses:Object.assign({arriba:{x:-30, y:-140, z:110}, a:{x:-44, y:-140, z:110}, b:{x:-16, y:-140, z:110}, plumas:{abanico:7, ondeo:9}, ciclos:4, velocidad:2.1}, get('gestos.saludo.poses', {})),
   clockOn:get('reloj.activo',true) !== false, clockPos:String(get('reloj.posicion','derecha')),
   subsOn:get('subtitulos.activos',true) !== false, medAuto:get('camaras.planoMedioCentradoAuto',true) !== false,
-  browAxis:String(get('expresion.cejas.eje','x')), browAmp:num('expresion.cejas.amplitud',12),
+  browAxis:String(get('expresion.cejas.eje','x')), browAmp:num('expresion.cejas.amplitud',12), browLift:num('expresion.cejas.levantar',0.016),
   exposure:num('iluminacion.exposicion',0.8), keyI:num('iluminacion.luzPrincipal',1), envI:num('iluminacion.reflejosEntorno',0.5), metal:num('iluminacion.metalizado',0)
 };
 const planes = get('camaras.planos', null);
 let cams = Array.isArray(planes) && planes.length === 3 ? planes.map(p => ({z:Number(p.zoom)||1, dx:Number(p.desplazX)||0, dy:Number(p.desplazY)||0}))
   : [{z:1,dx:0,dy:0},{z:1.75,dx:-0.03,dy:-0.02},{z:2.3,dx:-0.02,dy:-0.05}];
 // CEJA_L / CEJA_R son opcionales: si el modelo los trae (agregados en Blender), se usan para la expresión; si no, se ignoran.
-const BONES = ['BOCA_INF','BOCA_SUP','PARPADOS_MAYA','OJO_R','OJO_L','CABEZA','COLUMNA','ALA_SUP_R','ALA_SUP_L','CEJA_L','CEJA_R'];
+const FEATHERS = []; for (const side of ['L','R']) for (let k = 1; k <= 5; k++) for (let sg = 1; sg <= 3; sg++) FEATHERS.push(`DEDO_${k}_${sg}_${side}`);
+const HAT = ['SOMBRERO_BASE','SOMBRERO_COPA_1','SOMBRERO_COPA_2','SOMBRERO_PUNTA','SOMBRERO_ALA','SOMBRERO_ALA_1'];
+// los huesos que no existan en el modelo se ignoran (así sirven modelos con más o menos huesos)
+const BONES = ['BOCA_INF','BOCA_SUP','PARPADOS_MAYA','OJO_R','OJO_L','CABEZA','COLUMNA','PECHO','ALA_SUP_R','ALA_SUP_L','CEJA_L','CEJA_R', ...HAT, ...FEATHERS];
 const manual = {}; for (const n of BONES) manual[n] = Object.assign({x:0,y:0,z:0}, get('ajusteManual.'+n, {}));
 
 // ---------------------------------------------------------------- escenario 1920x1080 escalado (igual que fitStage de output.js)
@@ -61,7 +70,7 @@ catch (err) { log('WebGL no disponible, se vuelve a la salida clásica', err); l
 renderer.setPixelRatio(1); renderer.setSize(W, H, false);
 renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = P.exposure;
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.setClearColor(0x000000, 0);
-setEl.insertBefore(renderer.domElement, $('viewFront'));
+setEl.insertBefore(renderer.domElement, $('lyDesk'));
 renderer.domElement.addEventListener('webglcontextlost', e => { e.preventDefault(); log('contexto WebGL perdido'); });
 const scene = new THREE.Scene();
 const pmrem = new THREE.PMREMGenerator(renderer);
@@ -146,16 +155,31 @@ let modelReady = false;
 new THREE.GLTFLoader().parse(b64ToBuffer(window.MERLIN_GLB_B64 || ''), '', gltf => {
   rig.add(gltf.scene);
   gltf.scene.traverse(o => {
-    if (o.isMesh) { o.frustumCulled = false; o.castShadow = true; o.material = upgradeMaterial(o.material); if (!mats.includes(o.material)) mats.push(o.material); }
-    if (o.isBone && BONES.includes(o.name) && !bones[o.name]) { bones[o.name] = o; rest[o.name] = o.quaternion.clone(); }
+    if (o.isMesh) { o.frustumCulled = false; o.castShadow = true; o.material = upgradeMaterial(o.material);
+      // párpados: color sólido en vez de la textura (la textura tenía una mancha oscura en esa zona). Usan el material PICO, por eso se clona.
+      const mn = (o.userData && o.userData.name) || o.name;
+      if (mn === 'PARPADOS' || (o.parent && ((o.parent.userData && o.parent.userData.name) || o.parent.name) === 'PARPADOS')) {
+        const m2 = o.material.clone(); m2.map = null; m2.color.setStyle(String(get('apariencia.colorParpados', '#c45e00'))).convertSRGBToLinear();
+        m2.userData = {...o.material.userData, baseColor:m2.color.clone(), isWhite:false}; addDeskOcclusion(m2); o.material = m2;
+      }
+      if (!mats.includes(o.material)) mats.push(o.material); }
+    // GLTFLoader renombra los nodos repetidos (p. ej. la malla CEJA_L y el hueso CEJA_L): se usa el nombre original del archivo
+    const bn = (o.userData && o.userData.name) || o.name;
+    if (o.isBone && BONES.includes(bn) && !bones[bn]) { bones[bn] = o; rest[bn] = o.quaternion.clone(); }
   });
   gltf.scene.updateMatrixWorld(true);
   if (P.wingsFix) setWings();
+  // cejas: se levantan desplazándose hacia arriba (no solo girando sobre un extremo, que se veía como una palanca)
+  gltf.scene.updateMatrixWorld(true);
+  for (const n of ['CEJA_L','CEJA_R']) { const b = bones[n]; if (!b || !b.parent) continue;
+    const wp = new THREE.Vector3(); b.getWorldPosition(wp); const a = b.parent.worldToLocal(wp.clone()), c = b.parent.worldToLocal(wp.clone().add(new THREE.Vector3(0, P.browLift, 0)));
+    browRest[n] = b.position.clone(); browUp[n] = c.sub(a); }
   modelReady = true; applyScene(); applyLight(); setCam(0, true);
   log('modelo listo', Object.keys(bones).length + ' huesos');
 }, err => { log('no se pudo cargar el modelo, se vuelve a la salida clásica', err); location.replace('output.html'); });
 function setWings(){
-  const target = bones.COLUMNA; if (!target) return;
+  // solo hace falta si las alas cuelgan de la cabeza (modelos antiguos); si ya cuelgan de PECHO se dejan como están
+  const target = bones.PECHO ? null : bones.COLUMNA; if (!target || !['ALA_SUP_R','ALA_SUP_L'].some(n => bones[n] && bones[n].parent === bones.CABEZA)) return;
   const wings = ['ALA_SUP_R','ALA_SUP_L'].filter(n => bones[n]);
   scene.updateMatrixWorld(true);
   wings.forEach(n => { target.attach(bones[n]); rest[n] = bones[n].quaternion.clone(); });
@@ -225,8 +249,14 @@ function updateCamera(dt){
   camNow.z += (camTarget.z - camNow.z) * k; camNow.cx += (camTarget.cx - camNow.cx) * k; camNow.cy += (camTarget.cy - camNow.cy) * k;
   const z = camNow.z * (1 + 0.04 * kb), half = 0.5 / z;
   const cx = Math.min(1-half, Math.max(half, camNow.cx)), cy = Math.min(1-half, Math.max(half, camNow.cy));
-  const tf = `translate(${((0.5 - cx*z)*100).toFixed(3)}%, ${((0.5 - cy*z)*100).toFixed(3)}%) scale(${z.toFixed(4)})`;
-  $('viewBack').style.transform = tf; $('viewFront').style.transform = tf;
+  // cada capa se acerca y se desplaza según su profundidad: lo lejano menos, lo cercano más (siempre cubriendo el cuadro)
+  const layer = (id, f) => {
+    if (!P.parallaxOn) f = 1;
+    const zl = 1 + (z - 1) * f, hl = 0.5 / zl;
+    const cxl = Math.min(1 - hl, Math.max(hl, 0.5 + (cx - 0.5) * f)), cyl = Math.min(1 - hl, Math.max(hl, 0.5 + (cy - 0.5) * f));
+    $(id).style.transform = `translate(${((0.5 - cxl*zl)*100).toFixed(3)}%, ${((0.5 - cyl*zl)*100).toFixed(3)}%) scale(${zl.toFixed(4)})`;
+  };
+  layer('lyBg', P.pxBg); layer('lyChair', P.pxChair); layer('lyDesk', P.pxDesk); layer('lyProps', P.pxProps);
   camera.setViewOffset(W*z, H*z, (cx*z - 0.5)*W, (cy*z - 0.5)*H, W, H);
 }
 
@@ -407,68 +437,27 @@ function updateClock(){
 }
 setInterval(updateClock, 1000);
 
-// ---------------------------------------------------------------- subtítulos (texto exacto de la locución)
-// Lab.30: el texto es el mismo que lee la voz (titular + guion, igual que locutionSource en la automatización) y avanza
-// con la voz real: main manda los tramos con voz del WAV (p.speechSegments); cada oración se ancla a su pausa y dentro
-// de la oración el texto solo avanza mientras Merlín habla, con pesos del texto hablado (p.ttsScript: cifras en letras).
-// Sin tramos se usa el reparto proporcional a la duración (comportamiento anterior).
-let subsChunks = [], subsKey = '', subsMap = null;
-const subsSentences = t => String(t || '').replace(/\s+/g, ' ').trim().split(/(?<=[.!?;:])\s+/).filter(Boolean);
-function locutionText(title, script){
-  const t = String(title || '').trim(), s = String(script || '').trim(); if (!t) return s; if (!s) return t;
-  const clean = x => x.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
-  const ct = clean(t), cs = clean(s.slice(0, Math.max(t.length * 2, 220)));
-  return ct && cs.startsWith(ct) ? s : `${t}. ${s}`;
-}
-function buildSubs(text, segs, spoken){
-  subsChunks = []; subsKey = ''; subsMap = null;
-  const sentences = subsSentences(text); if (!sentences.length) return;
-  const sentW = [];
-  sentences.forEach((sen, si) => {
+// ---------------------------------------------------------------- subtítulos (texto exacto del guion, tiempos estimados)
+let subsChunks = [], subsKey = '', subsQ = false;
+function buildSubs(text){
+  const clean = String(text || '').replace(/\s+/g, ' ').trim(); subsChunks = []; subsKey = '';
+  if (!clean) return;
+  const sentences = clean.split(/(?<=[.!?;:])\s+/);
+  for (const sen of sentences) {
     const words = sen.split(' '); let cur = [];
-    const push = c => subsChunks.push({words: c, sentence: si});
-    for (const w of words) { cur.push(w); if (cur.join(' ').length >= 58 || cur.length >= 11) { push(cur); cur = []; } }
-    if (cur.length) { const last = subsChunks[subsChunks.length - 1]; if (cur.length <= 2 && last && last.sentence === si && last.words.length < 13) last.words.push(...cur); else push(cur); }
-  });
-  let acc = 0; subsChunks = subsChunks.map(c => { const weight = c.words.join(' ').length + 6; const x = {...c, start: acc, weight}; acc += weight; return x; });
-  subsChunks.total = acc;
-  sentences.forEach((_, si) => { const cs = subsChunks.filter(c => c.sentence === si); sentW.push({c0: cs[0].start, c1: cs[cs.length - 1].start + cs[cs.length - 1].weight}); });
-  const spokenSent = subsSentences(spoken), timeW = spokenSent.length === sentences.length ? spokenSent.map(x => x.length + 6) : sentW.map(x => x.c1 - x.c0);
-  subsMap = alignSubs(Array.isArray(segs) ? segs : null, timeW, sentW);
-}
-function alignSubs(segs, w, sentW){
-  const seg = (segs || []).filter(x => Array.isArray(x) && x[1] > x[0]).sort((a, b) => a[0] - b[0]);
-  if (!seg.length) return null;
-  const vStart = []; let T = 0; for (const x of seg) { vStart.push(T); T += x[1] - x[0]; }
-  if (T <= 0) return null;
-  const gaps = []; for (let i = 0; i + 1 < seg.length; i++) gaps.push({v: vStart[i] + seg[i][1] - seg[i][0], dur: seg[i + 1][0] - seg[i][1], idx: i});
-  const W = w.reduce((a, b) => a + b, 0) || 1, len = w.map(x => T * x / W), bounds = [0];
-  let expected = 0, lastGap = -1;
-  for (let k = 1; k < w.length; k++) {
-    expected += len[k - 1];
-    const tol = 0.45 * Math.min(len[k - 1], len[k]);
-    let best = null, bestScore = Infinity;
-    for (const g of gaps) { if (g.idx <= lastGap || g.dur < 0.18 || Math.abs(g.v - expected) > tol) continue; const sc = Math.abs(g.v - expected) - 0.15 * g.dur; if (sc < bestScore) { bestScore = sc; best = g; } }
-    if (best) { lastGap = best.idx; bounds.push(best.v); } else bounds.push(Math.max(bounds[bounds.length - 1], expected));
+    for (const w of words) { cur.push(w); if (cur.join(' ').length >= 58 || cur.length >= 11) { subsChunks.push(cur); cur = []; } }
+    if (cur.length) { if (cur.length <= 2 && subsChunks.length && subsChunks[subsChunks.length-1].length < 13) subsChunks[subsChunks.length-1].push(...cur); else subsChunks.push(cur); }
   }
-  bounds.push(T);
-  const voicedAt = t => { let v = 0; for (let i = 0; i < seg.length; i++) { const [a, b] = seg[i]; if (t <= a) break; v += Math.min(t, b) - a; } return v; };
-  return {T, bounds, sentW, voicedAt};
-}
-function subsPos(){
-  if (!subsMap) return Math.min(1, audio.currentTime / audio.duration) * subsChunks.total;
-  const m = subsMap, v = m.voicedAt(audio.currentTime);
-  // en la pausa (v justo en el límite) queda la oración terminada; la siguiente aparece cuando vuelve la voz
-  let k = m.sentW.length - 1; for (let i = 0; i < m.sentW.length; i++) { if (v <= m.bounds[i + 1]) { k = i; break; } }
-  const span = Math.max(1e-6, m.bounds[k + 1] - m.bounds[k]), frac = Math.max(0, Math.min(1, (v - m.bounds[k]) / span));
-  return m.sentW[k].c0 + frac * (m.sentW[k].c1 - m.sentW[k].c0 - 1e-6);
+  let acc = 0; subsChunks = subsChunks.map(words => { const weight = words.join(' ').length + 6; const c = {words, start:acc, weight}; acc += weight; return c; });
+  subsChunks.total = acc;
 }
 function updateSubs(){
   const el = $('subs');
   const live = P.subsOn && subsChunks.length && (activeKind === 'news' || activeKind === 'host') && !audio.paused && !audio.ended && audio.duration > 0;
-  if (!live) { el.classList.remove('on'); return; }
-  const pos = subsPos();
+  if (!live) { el.classList.remove('on'); subsQ = false; return; }
+  const pos = Math.min(1, audio.currentTime / audio.duration) * subsChunks.total;
   let c = subsChunks[subsChunks.length - 1]; for (const x of subsChunks) { if (pos < x.start + x.weight) { c = x; break; } }
+  subsQ = /[?¿]/.test(c.words.join(' '));
   const inner = Math.max(0, Math.min(1, (pos - c.start) / c.weight)), n = c.words.length, said = Math.min(n, Math.floor(inner * (n + 1)));
   const key = subsChunks.indexOf(c) + ':' + said;
   if (key !== subsKey) {
@@ -482,7 +471,7 @@ function updateSubs(){
 }
 
 // ---------------------------------------------------------------- expresión según el tono de la noticia (p.tone: serio | neutral | ligero)
-const TONES = { serio:{sway:.35, wings:.25, lid:14, blinkMin:4, blinkMax:7, gazeAway:.12, brow:-1}, neutral:{sway:1, wings:1, lid:0, blinkMin:3, blinkMax:6, gazeAway:.3, brow:0}, ligero:{sway:1.4, wings:1.4, lid:0, blinkMin:2.5, blinkMax:5, gazeAway:.35, brow:1} };
+const TONES = { serio:{sway:.35, wings:.25, lid:6, blinkMin:4, blinkMax:7, gazeAway:.12, brow:-1}, neutral:{sway:1, wings:1, lid:0, blinkMin:3, blinkMax:6, gazeAway:.3, brow:0}, ligero:{sway:1.4, wings:1.4, lid:0, blinkMin:2.5, blinkMax:5, gazeAway:.35, brow:1} };
 let toneName = 'neutral'; const toneNow = {...TONES.neutral};
 function setTone(t){ toneName = TONES[t] ? t : 'neutral'; }
 
@@ -502,9 +491,7 @@ async function startMusic(){
 function hideCanned(){
   const layer = $('cannedLayer'); if (!layer.classList.contains('on')) return;
   renderPaused = false; layer.classList.remove('on');
-  // Lab.30: el video se pausa en el acto (antes seguía sonando bajo Merlín en la despedida o el pase)
-  try { video.pause(); } catch {}
-  setTimeout(() => { if (activeKind !== 'canned') { try { video.removeAttribute('src'); video.load(); } catch {} } }, 800);
+  setTimeout(() => { if (activeKind === 'news') { try { video.pause(); video.removeAttribute('src'); video.load(); } catch {} } }, 800);
 }
 // ---- video de espera (standby), igual que output-0331.js: al abrir la salida y tras 'stop'
 const standbyEl = $('standbyLayer'), standbyVideo = $('standbyVideo');
@@ -548,7 +535,7 @@ async function showNews(p, my){
   // textos generados por la IA local de EC1
   const lowerWasOn = $('lower').classList.contains('on') && activeKind === 'news';
   setLower(p.title, p.category || 'ACTUALIDAD', !!p.isExclusive);
-  buildSubs(locutionText(p.title, p.script || p.summary || ''), p.speechSegments, p.ttsScript); setTone(p.tone); hlIdx = -1;
+  buildSubs(p.script || p.summary || ''); setTone(p.tone); hlIdx = -1;
   $('fTitle').textContent = p.title || ''; $('fSummary').textContent = p.summary || '';
   $('fCat').textContent = String(p.category || 'ACTUALIDAD').toUpperCase(); $('fDate').textContent = ecDate(p.pubDate || p.date || '');
   $('fExcl').classList.toggle('show', !!p.isExclusive && design.exclusiveEnabled !== false);
@@ -575,7 +562,9 @@ let hostSegment = '';
 function hostReport(type, message = ''){ try { window.ECAPI.presenterHostPlayback && window.ECAPI.presenterHostPlayback({type, segment:hostSegment, message}); } catch {} }
 async function showHost(p, my){
   clearTimeout(introTimer); hostSegment = String(p.segment || '');
-  buildSubs(p.hostText || '', p.speechSegments, ''); setTone(hostSegment === 'despedida' ? 'neutral' : 'ligero');
+  // saludo con el ala al presentarse y al despedirse
+  if (P.waveOn && (hostSegment === 'intro' || hostSegment === 'despedida')) waveT = -0.25;
+  buildSubs(p.hostText || ''); setTone(hostSegment === 'despedida' ? 'neutral' : 'ligero');
   headlines = Array.isArray(p.headlines) ? p.headlines.slice(0, 6) : []; hlIdx = -1; hlIntroSec = Number(p.headlinesIntroSec) || 4; if (Array.isArray(p.headlineMarks)) headlines.marks = p.headlineMarks.map(Number);
   { const w = coverWaitMs(); if (w) { await sleep(w); if (my !== serial) return; } }
   newsLayout = false;
@@ -627,6 +616,19 @@ if (api) {
 // ---------------------------------------------------------------- animación
 const clock = new THREE.Clock(), eul = new THREE.Euler(), quat = new THREE.Quaternion(), D = Math.PI/180;
 let mouth = 0, talkE = 0, prevLvl = 0, gestT = 0, gestSide = 'R', blinkT = 0, nextBlink = 2 + Math.random()*3;
+// ruido suave 1D (-1..1): movimiento orgánico que no se repite
+function hash1(n){ const x = Math.sin(n*127.1)*43758.5453; return x - Math.floor(x); }
+function vnoise(x, seed){ const i = Math.floor(x), f = x - i, u = f*f*(3 - 2*f); return (hash1(i + seed*57.3)*(1 - u) + hash1(i + 1 + seed*57.3)*u)*2 - 1; }
+// resorte amortiguado: inercia, anticipación y un leve rebote (freq en Hz; zeta < 1 = rebota un poco)
+const sp = () => ({p:0, v:0});
+function spring(s, target, dt, freq, zeta){ const w = 2*Math.PI*freq; for (let k = 0, h = dt/2; k < 2; k++) { s.v += (w*w*(target - s.p) - 2*zeta*w*s.v)*h; s.p += s.v*h; } }
+function kick(s, vel){ s.v += vel; }
+const head = {x:sp(), y:sp(), z:sp()}, col = sp(), wing = {lR:sp(), lL:sp(), fR:sp(), fL:sp()};
+const browRest = {}, browUp = {};
+let waveT = -9, waveHold = null;  // tiempo del saludo (negativo = espera corta antes de empezar; -9 = inactivo)
+const hatX = sp(), hatZ = sp(), brim = sp(), brimZ = sp(), fdrag = {R:sp(), L:sp()}, browSp = {L:sp(), R:sp()}; let waveE = 0, lean = 0, browCd = 2, browFlash = {L:0, R:0, t:0};
+let accentCd = 0, silentT = 0, phraseGap = false, phraseYaw = 0, lookW = 0, wasPausing = false, doubleBlink = false, microT = 0, micro = {x:0, z:0};
+function blinkNow(){ if (blinkT < nextBlink) nextBlink = blinkT; }
 let gaze = {x:0, z:0}, gazeTarget = {x:0, z:0}, nextGaze = 2;
 function setBone(name, x, y, z){ const b = bones[name]; if (!b) return; const m = manual[name]; eul.set((x+m.x)*D, (y+m.y)*D, (z+m.z)*D, 'ZYX'); b.quaternion.copy(rest[name]).multiply(quat.setFromEuler(eul)); }
 function blinkCurve(t){ if (t < .06) return t/.06; if (t < .09) return 1; if (t < .16) return 1 - (t-.09)/.07; return 0; }
@@ -664,32 +666,109 @@ function tick(){
   mouth += (lvl - mouth) * Math.min(1, (lvl > mouth ? 35 : P.release) * dt);
   const open = mouth * P.maxOpen;
   setBone('BOCA_INF', -open, 0, 0); setBone('BOCA_SUP', open * P.upper, 0, 0);
+  // ---- vida: ruido orgánico, gestos guiados por la voz, resortes con inercia, ojos vivos y comportamiento en las pausas
+  const speaking = (activeKind === 'news' || activeKind === 'host') && !audio.paused && !audio.ended;
+  const pausing = activeKind === 'news' && !speaking;                       // pausa entre noticias (o fin de la nota)
+  if (speaking) {
+    // acentos de la voz: asentimiento o leve inclinación, a veces con parpadeo
+    if (lvl > .65 && prevLvl < .3 && accentCd <= 0 && Math.random() < .4) { accentCd = 1.6 + Math.random()*1.6; if (Math.random() < .7) kick(head.x, 7 + Math.random()*4); else kick(head.z, (Math.random() < .5 ? -1 : 1) * 6); }
+    // pausa entre frases: respiración, posible parpadeo y un pequeño giro para la siguiente frase
+    silentT = lvl < .05 ? silentT + dt : 0;
+    if (silentT > .35 && !phraseGap) { phraseGap = true; kick(col, -4); if (Math.random() < .35) blinkNow(); if (Math.random() < .5) phraseYaw = (Math.random()*2 - 1) * 3; }
+    if (lvl > .2) phraseGap = false;
+  } else { silentT = 0; phraseGap = false; }
+  accentCd -= dt; phraseYaw *= Math.max(0, 1 - .25*dt);
+  // al volver a hablar después de una pausa: vuelve a mirar a cámara con un parpadeo
+  if (speaking && wasPausing) blinkNow(); wasPausing = pausing;
+  lookW += ((pausing ? 1 : 0) - lookW) * Math.min(1, (pausing ? 1.6 : 4) * dt);
+  // parpadeo (con parpadeos dobles ocasionales)
   let lid = 0;
-  if (P.blink) { blinkT += dt; if (blinkT >= nextBlink) { lid = blinkCurve(blinkT - nextBlink); if (blinkT - nextBlink > .16) { blinkT = 0; nextBlink = toneNow.blinkMin + Math.random()*(toneNow.blinkMax - toneNow.blinkMin); } } }
-  setBone('PARPADOS_MAYA', Math.max(toneNow.lid, lid * 121), 0, 0);
-  { const bv = toneNow.brow * P.browAmp, bx = P.browAxis === 'x' ? bv : 0, by = P.browAxis === 'y' ? bv : 0, bz = P.browAxis === 'z' ? bv : 0; setBone('CEJA_L', bx, by, bz); setBone('CEJA_R', bx, by, P.browAxis === 'z' ? -bz : bz); }
-  if (P.gazeOn) { nextGaze -= dt; if (nextGaze <= 0) { const away = Math.random() < toneNow.gazeAway; gazeTarget = away ? {x:(Math.random()*2-1)*4, z:(Math.random()*2-1)*9} : {x:0, z:0}; nextGaze = away ? .6 + Math.random()*.8 : 2 + Math.random()*3; } }
-  gaze.x += (gazeTarget.x - gaze.x) * Math.min(1, 14*dt); gaze.z += (gazeTarget.z - gaze.z) * Math.min(1, 14*dt);
+  if (P.blink) { blinkT += dt; if (blinkT >= nextBlink) { lid = blinkCurve(blinkT - nextBlink); if (blinkT - nextBlink > .16) { blinkT = 0; nextBlink = doubleBlink ? .1 : toneNow.blinkMin + Math.random()*(toneNow.blinkMax - toneNow.blinkMin); doubleBlink = !doubleBlink && Math.random() < .15; } } }
+  setBone('PARPADOS_MAYA', Math.max(toneNow.lid + lookW*5, lid * 121), 0, 0);
+  // cejas: además del tono, acompañan la voz (se levantan en los énfasis y en las preguntas), hacen "destellos" cortos al hablar,
+  // a veces solo una, y se fruncen un poco al leer la tablet. Valores en unidades de "levantar": 1 = amplitud configurada.
+  if (bones.CEJA_L || bones.CEJA_R) {
+    if (speaking) { browCd -= dt; if (browCd <= 0) { browCd = 3.5 + Math.random()*3; const one = Math.random() < .12; const side = Math.random() < .5 ? 'L' : 'R'; browFlash = {L: one && side === 'R' ? 0 : .8, R: one && side === 'L' ? 0 : .8, t: .8}; } }
+    browFlash.t = Math.max(0, browFlash.t - dt);
+    const flash = side => browFlash.t > 0 ? browFlash[side] : 0;
+    const base = toneNow.brow * .7 + (subsQ && speaking ? .8 : 0) - lookW * .45 + waveE * .7;
+    spring(browSp.L, base + flash('L'), dt, 1.8, .85); spring(browSp.R, base + flash('R'), dt, 1.8, .85);
+    const ax = P.browAxis, amp = P.browAmp;
+    // la ceja sube y baja (desplazamiento) con un giro leve para la expresión; positivo = levantar
+    const put = (n, v, mirror) => { const a = v * amp * .3; setBone(n, ax === 'x' ? a : 0, ax === 'y' ? a : 0, ax === 'z' ? (mirror ? -a : a) : 0);
+      const b = bones[n]; if (b && browRest[n]) b.position.copy(browRest[n]).addScaledVector(browUp[n], v); };
+    put('CEJA_L', browSp.L.p, false); put('CEJA_R', browSp.R.p, true);
+  }
+  // mirada: miradas ocasionales + microsacadas (los ojos nunca están del todo quietos) + mirar la tablet en las pausas
+  if (P.gazeOn) { nextGaze -= dt; if (nextGaze <= 0) { const away = Math.random() < toneNow.gazeAway; gazeTarget = away ? {x:(Math.random()*2-1)*4, z:(Math.random()*2-1)*9} : {x:0, z:0}; nextGaze = away ? .6 + Math.random()*.8 : 2 + Math.random()*3; if (away && Math.random() < .4) blinkNow(); } }
+  microT -= dt; if (microT <= 0) { micro = {x:(Math.random()*2-1)*.7, z:(Math.random()*2-1)*1.3}; microT = .25 + Math.random()*.7; }
+  const gx = (gazeTarget.x + micro.x) * (1 - lookW) + 9 * lookW, gz = (gazeTarget.z + micro.z) * (1 - lookW) - 11 * lookW;
+  gaze.x += (gx - gaze.x) * Math.min(1, 16*dt); gaze.z += (gz - gaze.z) * Math.min(1, 16*dt);
   setBone('OJO_R', gaze.x, 0, gaze.z); setBone('OJO_L', gaze.x, 0, gaze.z);
-  let hx = 0, hy = 0, hz = 0;
-  if (P.headOn) { const talk = (1 + mouth*1.5*P.headTalk) * toneNow.sway; hx = Math.sin(t*.9)*1.2*talk + mouth*3*P.headTalk; hy = Math.sin(t*.45 + 1)*3*talk; hz = Math.sin(t*.6 + 2)*2*talk; }
-  setBone('CABEZA', hx, hy - P.rotY * P.look, hz);
-  const br = P.breath ? Math.sin(t*Math.PI*2/4) : 0;
-  setBone('COLUMNA', br*1.2, 0, 0);
+  // cabeza: ruido suave (nunca repite el patrón) + giro de frase + inclinación en preguntas + mirar la tablet; todo con resortes
+  let tx = 0, ty = 0, tz = 0;
+  if (P.headOn) {
+    const amp = toneNow.sway * (speaking ? 1 : .7) * (1 + mouth*.5*P.headTalk);
+    tx = vnoise(t*.35, 1)*2.2*amp + mouth*3*P.headTalk; ty = vnoise(t*.22, 2)*4*amp + phraseYaw; tz = vnoise(t*.3, 3)*2.4*amp + (subsQ && speaking ? 3 : 0);
+  }
+  tx += 7*lookW; ty += 11*lookW; tz += waveE * (P.waveSide === 'R' ? -4 : 4);
+  // resortes lentos y bien amortiguados: la cabeza se acomoda con suavidad, sin sacudidas
+  spring(head.x, tx, dt, 1.3, .85); spring(head.y, ty, dt, 1.0, .9); spring(head.z, tz, dt, 1.1, .85);
+  setBone('CABEZA', head.x.p, head.y.p - P.rotY * P.look, head.z.p);
+  // respiración: lenta e irregular, más una toma de aire en cada pausa entre frases
+  const br = P.breath ? vnoise(t*.22, 7)*.6 + Math.sin(t*Math.PI*2/4.6)*.8 : 0;
+  spring(col, br*1.2 + 2*lookW, dt, 1.2, .75);
+  // postura: con PECHO, la respiración se reparte y al hablar se inclina apenas hacia el micrófono
+  if (bones.PECHO) { lean += ((speaking ? 1.6 : 0) - lean) * Math.min(1, .8*dt); setBone('COLUMNA', col.p*.55, 0, 0); setBone('PECHO', col.p*.55 + lean, 0, 0); }
+  else setBone('COLUMNA', col.p, 0, 0);
+  // alas: misma lógica de energía y gestos, pero con resortes (anticipación y pequeño rebote)
   const wd = P.wingDrop + br*1.5, targetE = Math.min(1, mouth*1.6);
   talkE += (targetE - talkE) * Math.min(1, (targetE > talkE ? 2.5 : .8) * dt);
   if (lvl > .75 && prevLvl < .45 && gestT <= 0 && Math.random() < .35) { gestSide = Math.random() < .5 ? 'R' : 'L'; gestT = 1; }
   prevLvl = lvl; gestT = Math.max(0, gestT - dt*1.4);
   const g = Math.sin(Math.PI*gestT) * P.wingTalk * toneNow.wings, en = talkE * P.wingTalk * toneNow.wings;
-  const liftR = en*(5 + 3*Math.sin(t*1.3 + .5) + 2*Math.sin(t*2.3)) + (gestSide === 'R' ? g*12 : 0);
-  const liftL = en*(5 + 3*Math.sin(t*1.1 + 2.1) + 2*Math.sin(t*2.7 + 1)) + (gestSide === 'L' ? g*12 : 0);
-  const fwdR = en*(4 + 3*Math.sin(t*.9 + 1.2)) + (gestSide === 'R' ? g*10 : 0), fwdL = en*(4 + 3*Math.sin(t*.8 + 3)) + (gestSide === 'L' ? g*10 : 0);
-  setBone('ALA_SUP_R', fwdR, 0, -(wd - liftR)); setBone('ALA_SUP_L', fwdL, 0, wd - liftL);
+  spring(wing.lR, en*(5 + 3*vnoise(t*.9, 11) + 2*vnoise(t*1.7, 12)) + (gestSide === 'R' ? g*12 : 0), dt, 2.0, .65);
+  spring(wing.lL, en*(5 + 3*vnoise(t*.8, 13) + 2*vnoise(t*1.9, 14)) + (gestSide === 'L' ? g*12 : 0), dt, 2.0, .65);
+  spring(wing.fR, en*(4 + 3*vnoise(t*.7, 15)) + (gestSide === 'R' ? g*10 : 0), dt, 1.8, .7);
+  spring(wing.fL, en*(4 + 3*vnoise(t*.6, 16)) + (gestSide === 'L' ? g*10 : 0), dt, 1.8, .7);
+  // saludo: sube el ala a la pose "arriba", oscila entre las poses "a" y "b" y vuelve; todo mezclado con la postura normal
+  const WP = P.wavePoses, cycles = Math.max(1, Number(WP.ciclos) || 4), freq = Math.max(.5, Number(WP.velocidad) || 2.1);
+  let wv = 0, wosc = 0, oscAmp = 0;
+  if (waveHold) { wv = 1; oscAmp = waveHold === 'arriba' ? 0 : 1; wosc = waveHold === 'a' ? -1 : waveHold === 'b' ? 1 : 0; }
+  else if (waveT > -9) { waveT += dt; const W_UP = .6, W_HOLD = cycles / freq, W_DOWN = .7;
+    if (waveT >= 0) { const tt = waveT; wv = tt < W_UP ? tt / W_UP : tt < W_UP + W_HOLD ? 1 : Math.max(0, 1 - (tt - W_UP - W_HOLD) / W_DOWN); wv = wv*wv*(3 - 2*wv);
+      const ot = tt - W_UP*.6; if (ot > 0 && ot < W_HOLD + .3) { wosc = -Math.cos(ot * Math.PI * 2 * freq); oscAmp = Math.min(1, ot / .25, (W_HOLD + .3 - ot) / .3); }
+      if (tt > W_UP + W_HOLD + W_DOWN) waveT = -9; } }
+  waveE += (wv - waveE) * Math.min(1, (waveHold ? 12 : 6)*dt);
+  const kk = (wosc + 1) / 2, lerp = (a, b, f) => a + (b - a) * f;
+  const pose = ax => lerp(WP.arriba[ax] || 0, lerp(WP.a[ax] || 0, WP.b[ax] || 0, kk), oscAmp);
+  const baseR = {x:wing.fR.p, y:0, z:-(wd - wing.lR.p)}, baseL = {x:wing.fL.p, y:0, z:wd - wing.lL.p};
+  if (P.waveSide === 'R') { setBone('ALA_SUP_R', lerp(baseR.x, pose('x'), waveE), lerp(0, pose('y'), waveE), lerp(baseR.z, pose('z'), waveE)); setBone('ALA_SUP_L', baseL.x, 0, baseL.z); }
+  else { setBone('ALA_SUP_L', lerp(baseL.x, pose('x'), waveE), lerp(0, -pose('y'), waveE), lerp(baseL.z, -pose('z'), waveE)); setBone('ALA_SUP_R', baseR.x, 0, baseR.z); }
+  // plumas de las alas: curvatura suave en reposo, "arrastre" al mover el ala (siguen al ala con retraso) y una ondulación mínima
+  if (bones.DEDO_1_1_R || bones.DEDO_1_1_L) {
+    spring(fdrag.R, -wing.lR.v * .15, dt, 2.2, .6); spring(fdrag.L, -wing.lL.v * .15, dt, 2.2, .6);
+    for (const side of ['R','L']) { const dz = side === 'R' ? fdrag.R.p : -fdrag.L.p;
+      for (let k = 1; k <= 5; k++) for (let sg = 1; sg <= 3; sg++) { const amp = [0, 1, 1.3, 1.6][sg];
+        const wvE = side === P.waveSide ? waveE : 0, fan = (k - 3) * (Number(P.wavePoses.plumas.abanico) || 0) * wvE * (side === 'R' ? 1 : -1), wig = wosc * oscAmp * (Number(P.wavePoses.plumas.ondeo) || 0) * wvE * Math.sin(sg * .9 + k * .4);
+        setBone(`DEDO_${k}_${sg}_${side}`, (4 + 1.2*vnoise(t*.8 + k*.7, 20 + k)) * amp * .6 * (1 - wvE) + wig, 0, dz * amp + fan); } }
+  }
+  // sombrero con física: la copa y la punta se quedan atrás cuando la cabeza se mueve, y rebotan suave
+  if (bones.SOMBRERO_COPA_1) {
+    spring(hatX, -head.x.v * .5 + vnoise(t*.5, 30)*.8, dt, 1.6, .35); spring(hatZ, (head.z.v * .5 - head.y.v * .3) + vnoise(t*.45, 31)*.8, dt, 1.5, .35);
+    setBone('SOMBRERO_COPA_1', hatX.p*.5, 0, hatZ.p*.5); setBone('SOMBRERO_COPA_2', hatX.p*.8, 0, hatZ.p*.8); setBone('SOMBRERO_PUNTA', hatX.p*1.1, 0, hatZ.p*1.1);
+    if (bones.SOMBRERO_ALA || bones.SOMBRERO_ALA_1) {
+      spring(brim, -head.x.v * .25 + vnoise(t*.6, 32)*.35, dt, 2.0, .45); spring(brimZ, head.z.v * .2 - head.y.v * .1, dt, 1.8, .45);
+      setBone('SOMBRERO_ALA', brim.p * .6, 0, brimZ.p * .5); setBone('SOMBRERO_ALA_1', brim.p, 0, brimZ.p * .8);
+    }
+  }
   updateCamera(dt);
   renderer.render(scene, camera);
 }
 applyScene();
 requestAnimationFrame(tick);
 showStandby();
-window.__merlinOutput = { P, cams, setCam, showSup, state:() => ({activeKind, camIdx, supMode, supShown, newsLayout, tainted, toneName, hlIdx, subs:$('subs').textContent}) };
+window.__merlinOutput = { P, cams, setCam, showSup,
+  // herramienta de poses del saludo
+  setWavePoses: o => { Object.assign(P.wavePoses, o); }, holdWave: name => { waveHold = name || null; if (!name) waveT = -9; }, playWave: () => { waveHold = null; waveT = -0.1; }, state:() => ({activeKind, camIdx, supMode, supShown, newsLayout, tainted, toneName, hlIdx, subs:$('subs').textContent, browL:+browSp.L.p.toFixed(2), browBone:!!bones.CEJA_L}) };
 })();
