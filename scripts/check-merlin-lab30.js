@@ -32,6 +32,10 @@ let checks=0;const ok=(v,m)=>{checks++;assert.ok(v,m);};
   vm.createContext(actx);vm.runInContext(read('output-merlin-preview-adapter.js'),actx);
   const designs=[],stories=[];win.ECAPI.on('output:design',d=>designs.push(d));win.ECAPI.on('output:story',p=>stories.push(p));
   ok(posted.some(m=>m.type==='gec-merlin-preview-ready'),'el adaptador debe avisar cuando la escena está lista');
+  // la vista previa usa el mismo set que la salida (capas del parallax): si difieren, output-merlin.js no encuentra sus capas
+  {const setOf=h=>h.slice(h.indexOf('<div class="set" id="set">'),h.indexOf('<div class="ots" id="ots">')).replace(/<!--[\s\S]*?-->/g,'').replace(/\s+/g,' ').trim();
+   ok(setOf(html)===setOf(read('output-merlin.html')),'la vista previa debe tener el mismo set (capas) que output-merlin.html');
+   for(const id of ['lyBg','lyChair','lyDesk','lyProps'])if(read('output-merlin.js').includes(`'${id}'`))ok(html.includes(`id="${id}"`),`a la vista previa le falta la capa ${id}`);}
   for(const f of msgListeners)f({data:{type:'gec-merlin-preview',design:{musicEnabled:true,musicUrl:'file:///m.mp3',standbyVideoUrl:'file:///s.mp4',voiceVolume:100,titleColor:'#fff'},story:{title:'Hola',audioUrl:'file:///x.wav'}}});
   ok(designs[0]&&designs[0].musicEnabled===false&&designs[0].standbyVideoUrl===''&&designs[0].voiceVolume===0&&designs[0].titleColor==='#fff','la vista previa debe ser muda y conservar el diseño');
   ok(stories[0]&&stories[0].kind==='news'&&stories[0].audioUrl===''&&stories[0].title==='Hola','la nota de ejemplo debe llegar sin audio');

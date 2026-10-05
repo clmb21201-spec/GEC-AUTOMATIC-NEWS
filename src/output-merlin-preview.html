@@ -11,14 +11,17 @@
 <div id="viewport">
   <div id="stage">
     <div class="set" id="set">
-      <div class="view" id="viewBack">
+      <!-- capas del set con profundidad distinta (parallax): fondo, silla, [Merlín 3D], mesa, objetos -->
+      <div class="view" id="lyBg">
         <img id="bg" alt="" src="assets/merlin/fondo.jpg">
         <div class="plane" id="framePlane"><img alt=""><i class="glare paper"></i></div>
-        <img id="chair" alt="" src="assets/merlin/silla.webp" style="transform-origin:52.86% 11.51%">
       </div>
-      <div class="view" id="viewFront">
+      <div class="view" id="lyChair"><img id="chair" alt="" src="assets/merlin/silla.webp" style="transform-origin:52.86% 11.51%"></div>
+      <div class="view" id="lyDesk">
         <img id="desk" alt="" src="assets/merlin/mesa.webp">
         <div class="plane" id="tabPlane"><img alt=""><i class="glare"></i></div>
+      </div>
+      <div class="view" id="lyProps">
         <img id="mic" alt="" src="assets/merlin/mic.webp" style="transform-origin:12.5% 70%">
         <img id="cups" alt="" src="assets/merlin/vasos.webp" style="transform-origin:49.9% 79.3%">
       </div>
