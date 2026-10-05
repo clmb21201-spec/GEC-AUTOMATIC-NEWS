@@ -81,6 +81,12 @@ Ver `INTEGRACION_MERLIN.md`, sección "Modelo y animación". Opciones nuevas en 
 
 - `output-merlin.html` y `output-merlin-web.html` cargan los mismos archivos de la promo que la clásica (`output-youtube-promo*.js|css`, `output-stabilization-lab28.css`); el recuadro se monta sobre `#stage` y usa `#cannedVideo`. Antes solo se inyectaba en `output.html` y en Merlín nunca aparecía. `outputLanServer.js` sirve esos archivos. Prueba: `scripts/check-merlin-youtube-promo.js`.
 
+## Lab.33 (horario automático y transmisión a YouTube)
+
+- `services/broadcastScheduleLab33.js` (se instala al final de `bootstrap-v2lab.js`; usa `global.__gecScheduleApi`, definido al final de `main.js`): franjas por perfil en `broadcast-schedule.json` (carpeta de datos) con días (lunes primero), `prep` / `emit` / `until` en 24 h y `youtube`. "Emitir" vacío = la emisión la inicia el operador; "Hasta" vacío = no se detiene sola; si una hora es menor que la anterior es del día siguiente. Cada 20 s: inicia la Preparación; 60 s antes de emitir pide a OBS que transmita; a la hora de emitir abre la salida e inicia la Emisión (si no hay noticias listas espera hasta 10 min); en "Hasta" detiene la Emisión (en Merlín espera la despedida: `outputBusy`), corta OBS y la Preparación (salvo que otra franja empiece en menos de 1 h). Cada acción se hace una vez por franja: lo que el operador pausa o detiene a mano se respeta. Franjas superpuestas no se guardan.
+- `services/obsWebSocketLab33.js`: cliente obs-websocket v5 con el WebSocket nativo (Electron 43 / Node 24), sin dependencias. OBS en la misma PC: `ws://127.0.0.1:4455`. Conexión en `obs-websocket.json` (contraseña cifrada con `safeStorage`).
+- Panel (`renderer-schedule-lab33.js`): pastilla junto a OUTPUT en la barra superior (próximo horario o estado; no agrega alto a ninguna pestaña), ventana "Horario automático" (AM/PM) y tarjeta "OBS / YouTube" en la pestaña Salida, debajo de Salida NDI®. IPC `schedule:get|set|state`, `obs:get|set|test|start|stop`; evento `schedule:state`. Prueba: `scripts/check-broadcast-schedule-lab33.js`.
+
 ## Pendiente
 
 - Integrar en modo Merlín el envío por NDI (hoy NDI queda bloqueado con aviso en modo Merlín).
