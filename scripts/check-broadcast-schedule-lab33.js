@@ -118,7 +118,8 @@ const MON=[5],weekday={id:'a',days:[1,1,1,1,1,0,0].map(Boolean),prep:'05:30',emi
   ok(/'schedule:state'\]\)/.test(pre)&&/scheduleSet:cfg=>invoke\('schedule:set',cfg\)/.test(pre)&&/obsStart:\(\)=>invoke\('obs:start'\)/.test(pre)&&/renderer-schedule-lab33\.js/.test(pre),'preload expone el horario, OBS y el panel');
   ok(/broadcastScheduleLab33'\)\.installBroadcastScheduleLab33\(\)/.test(boot),'el servicio se instala en el arranque');
   ok(/insertAdjacentElement\('afterend', pill\)/.test(ren)&&ren.includes("$('#outputStatus')")&&ren.includes("$('#ecNdiOutputCard')"),'pastilla junto a OUTPUT y tarjeta OBS debajo de NDI');
-  ok(/check-broadcast-schedule-lab33\.js/.test(pkg.scripts.check),'el check corre en npm run check');
+  ok(/node scripts\/check-labs\.js/.test(pkg.scripts.check)&&/check-broadcast-schedule-lab33\.js/.test(read('scripts/check-labs.js')),'el check corre en npm run check (vía scripts/check-labs.js)');
+  ok(pkg.scripts.check.length<8100,`el script check debe quedar bajo el límite de cmd.exe en Windows (${pkg.scripts.check.length} caracteres)`);
   fs.rmSync(tmp,{recursive:true,force:true});
   console.log(`check-broadcast-schedule-lab33 OK (${checks} verificaciones) · franjas · motor · OBS · IPC`);
   process.exit(0);

@@ -8,6 +8,7 @@ App de escritorio Electron (Windows, portable) que arma una emisión automática
 
 - La app se compila **solo en GitHub Actions** (`.github/workflows/build-windows.yml`, en `windows-latest`) con cada push a `main`. El artefacto es un EXE portable.
 - Antes de hacer commit: `npm run check` (checks estáticos y de regresión; exige Node 22 y Python 3.12). Si algo falla, explicar la causa antes de cambiar código.
+- El script `check` de `package.json` está al límite de 8191 caracteres de `cmd.exe` en Windows (CI falla con "The command line is too long"): los checks nuevos (Lab.33 en adelante) van en `scripts/check-labs.js`, no en `package.json`.
 - El proyecto crece por **archivos versionados** que parchean a los anteriores (`renderer-0324.js` … `renderer-0332.js`, `output-0324.js` … `output-0331.js`, `services/*0329.js`, etc.). No reescribir ni borrar los anteriores: agregar comportamiento nuevo en archivos nuevos o en puntos acotados, y sumar su `node --check` al script `check` de `package.json`.
 - `src/preload.js` inyecta los scripts versionados según la página (`control.html`, `output.html`) y expone `window.ECAPI` (API de salida para las páginas de output, API de control para el panel).
 - Entrada: `src/bootstrap-v2lab.js` → cadena de bootstraps → `src/main.js`.
