@@ -8,6 +8,7 @@ App de escritorio Electron (Windows, portable) que arma una emisión automática
 
 - La app se compila **solo en GitHub Actions** (`.github/workflows/build-windows.yml`, en `windows-latest`) con cada push a `main`. El artefacto es un EXE portable.
 - Antes de hacer commit: `npm run check` (checks estáticos y de regresión; exige Node 22 y Python 3.12). Si algo falla, explicar la causa antes de cambiar código.
+- El script `check` de `package.json` está al límite de 8191 caracteres de `cmd.exe` en Windows (CI falla con "The command line is too long"): los checks nuevos (Lab.33 en adelante) van en `scripts/check-labs.js`, no en `package.json`.
 - El proyecto crece por **archivos versionados** que parchean a los anteriores (`renderer-0324.js` … `renderer-0332.js`, `output-0324.js` … `output-0331.js`, `services/*0329.js`, etc.). No reescribir ni borrar los anteriores: agregar comportamiento nuevo en archivos nuevos o en puntos acotados, y sumar su `node --check` al script `check` de `package.json`.
 - `src/preload.js` inyecta los scripts versionados según la página (`control.html`, `output.html`) y expone `window.ECAPI` (API de salida para las páginas de output, API de control para el panel).
 - Entrada: `src/bootstrap-v2lab.js` → cadena de bootstraps → `src/main.js`.
@@ -80,6 +81,12 @@ Ver `INTEGRACION_MERLIN.md`, sección "Modelo y animación". Opciones nuevas en 
 ## Promo de YouTube en Merlín
 
 - `output-merlin.html` y `output-merlin-web.html` cargan los mismos archivos de la promo que la clásica (`output-youtube-promo*.js|css`, `output-stabilization-lab28.css`); el recuadro se monta sobre `#stage` y usa `#cannedVideo`. Antes solo se inyectaba en `output.html` y en Merlín nunca aparecía. `outputLanServer.js` sirve esos archivos. Prueba: `scripts/check-merlin-youtube-promo.js`.
+
+## Lab.33 (horario automático y transmisión a YouTube)
+
+- `services/broadcastScheduleLab33.js` (se instala al final de `bootstrap-v2lab.js`; usa `global.__gecScheduleApi`, definido al final de `main.js`): franjas por perfil en `broadcast-schedule.json` (carpeta de datos) con días (lunes primero), `prep` / `emit` / `until` en 24 h y `youtube`. "Emitir" vacío = la emisión la inicia el operador; "Hasta" vacío = no se detiene sola; si una hora es menor que la anterior es del día siguiente. Cada 20 s: inicia la Preparación; 60 s antes de emitir pide a OBS que transmita; a la hora de emitir abre la salida e inicia la Emisión (si no hay noticias listas espera hasta 10 min); en "Hasta" detiene la Emisión (en Merlín espera la despedida: `outputBusy`), corta OBS y la Preparación (salvo que otra franja empiece en menos de 1 h). Cada acción se hace una vez por franja: lo que el operador pausa o detiene a mano se respeta. Franjas superpuestas no se guardan.
+- `services/obsWebSocketLab33.js`: cliente obs-websocket v5 con el WebSocket nativo (Electron 43 / Node 24), sin dependencias. OBS en la misma PC: `ws://127.0.0.1:4455`. Conexión en `obs-websocket.json` (contraseña cifrada con `safeStorage`).
+- Panel (`renderer-schedule-lab33.js`): pastilla junto a OUTPUT en la barra superior (próximo horario o estado; no agrega alto a ninguna pestaña), ventana "Horario automático" (AM/PM) y tarjeta "OBS / YouTube" en la pestaña Salida, debajo de Salida NDI®. IPC `schedule:get|set|state`, `obs:get|set|test|start|stop`; evento `schedule:state`. Prueba: `scripts/check-broadcast-schedule-lab33.js`.
 
 ## Pendiente
 

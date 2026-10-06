@@ -422,3 +422,6 @@ const presenterNdiGuard=(()=>{const {OutputNdi}=require('./services/outputNdi'),
     else{if(outputNdi.config?.enabled){await outputNdi.start();if(outputNdi.status().running)ensureNdiWindow();}outputNdi.emit();}}
   return{onModeChange:()=>onModeChange().catch(e=>logEvent('PRESENTER_NDI',e.message||e)),blocked};
 })();
+// ---- Lab.33: API para el horario automático (services/broadcastScheduleLab33.js). "Emitir" hace lo mismo que el botón
+// Iniciar emisión (abre la salida si está cerrada); outputBusy indica si queda algo en pantalla (Merlín despidiéndose).
+globalThis.__gecScheduleApi={automation:()=>automation,dataDir:()=>dataDir||portableDataDir(),startEmission:()=>{if(!outputReady())createOutputWindow(false);return automation.startEmission();},outputBusy:()=>!!currentOutputProgram,notify:(ch,p)=>sendControl(ch,p),log:(k,m)=>logEvent(k,m)};

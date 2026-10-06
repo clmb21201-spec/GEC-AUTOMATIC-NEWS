@@ -46,4 +46,5 @@ if(!gotLock){app.quit();}else{
   require('./services/releaseV2QwenSpeedLab31').installReleaseV2QwenSpeedLab31();
   require('./services/releaseV2ProfileByModelLab31').installReleaseV2ProfileByModelLab31();
   require('./services/documentCodesSpeechLab32').installDocumentCodesSpeechLab32({dataRoot:require('./services/releaseV2GlobalOptimizationLab29').dataRoot});
+  require('./services/broadcastScheduleLab33').installBroadcastScheduleLab33();
 }
