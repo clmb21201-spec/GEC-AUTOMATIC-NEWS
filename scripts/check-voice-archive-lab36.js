@@ -84,7 +84,8 @@ ok(V.cleanup({folder:out,keepDays:0})===0,'keepDays 0 no debe borrar');
 
 // ---- Merlín solo habla si la salida muestra su página (si WebGL falla, la salida vuelve a output.html)
 const main=fs.readFileSync(path.join(root,'src/main.js'),'utf8');
-const m=main.match(/const merlinPage=\(\)=>\{.*?\};\n/s);ok(m,'main.js no define merlinPage');
+// en Windows git deja saltos de línea \r\n
+const m=main.match(/const merlinPage=\(\)=>\{.*?\};(?=\r?\n)/s);ok(m,'main.js no define merlinPage');
 const page=url=>{const ctx={outputWindow:url==null?null:{isDestroyed:()=>false,webContents:{getURL:()=>url}}};vm.createContext(ctx);return vm.runInContext(`${m[0]};merlinPage()`,ctx);};
 ok(page('file:///C:/GEC/resources/app.asar/src/output-merlin.html')===true,'con la página de Merlín debe hablar');
 ok(page('file:///C:/GEC/resources/app.asar/src/output.html')===false,'con la salida clásica (respaldo) no debe hablar');
