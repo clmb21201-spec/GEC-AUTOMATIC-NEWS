@@ -4,8 +4,10 @@
 // - Tema de avisos (el operador se suscribe en la app ntfy): GEC publica el estado con botones.
 // - Tema de órdenes (`<tema>-cmd`, oculto): los botones mandan ahí {"gec":<clave>,"c":<orden>}.
 //   También se pueden escribir órdenes en el tema de avisos con el PIN: "pausar 1234".
-// Órdenes: pausar, reanudar, siguiente, detener la preparación y cortar la transmisión de OBS (estas dos piden
-// confirmación con un segundo botón), estado y menú. Configuración en remote-ntfy.json (carpeta de datos);
+// Órdenes: pausar, reanudar, siguiente, ver pantalla (captura de la salida), detener la preparación e iniciar / cortar
+// la transmisión de OBS (estas tres piden confirmación con un segundo botón), estado y menús.
+// Avisos automáticos: inicio / fin de la emisión, salida trabada (una pieza al aire mucho más de lo que dura),
+// transmisión cortada sin que nadie la cortara y errores del horario. Configuración en remote-ntfy.json (carpeta de datos);
 // PIN y token cifrados con safeStorage. IPC remote:get|set|test|newTopic; evento remote:state.
 const fs=require('fs');
 const path=require('path');
@@ -23,11 +25,13 @@ const ALIASES=[
   [/^(siguiente|pasar|saltar|next|skip)\b/,'next'],
   [/^(detener|parar|stop) (la )?(preparacion|prep|procesamiento)\b/,'prep-stop!'],
   [/^(cortar|detener|parar|stop) (la )?(transmision|youtube|obs)\b|^cortar\b|^obs off\b/,'obs-stop!'],
+  [/^(iniciar|empezar|arrancar|start) (la )?(transmision|youtube|obs)\b|^transmitir\b|^obs on\b/,'obs-start!'],
+  [/^(ver )?(pantalla|captura|screen)\b/,'screen'],
   [/^(estado|status|como va)\b/,'status'],
   [/^(menu|botones|ayuda|help)\b/,'menu'],
   [/^(mas|mas opciones|more)\b/,'more'],
 ];
-const KNOWN=new Set(['pause','resume','next','prep-stop','prep-stop!','obs-stop','obs-stop!','status','menu','more']);
+const KNOWN=new Set(['pause','resume','next','prep-stop','prep-stop!','obs-stop','obs-stop!','obs-start','obs-start!','obs','screen','status','menu','more']);
 // Texto escrito en la app: la orden y el PIN en cualquier parte ("pausar 1234"). Lo escrito ya es deliberado:
 // detener / cortar se ejecutan sin pedir confirmación.
 function parseTyped(text,pin){
@@ -41,11 +45,14 @@ function parseButton(text,key){
   try{const o=JSON.parse(String(text||''));if(o&&typeof o==='object'&&'gec' in o)return{c:String(o.c||''),valid:!!key&&String(o.gec)===String(key)};}catch{}
   return null;
 }
-const LABEL={pause:'Pausar',resume:'Reanudar',next:'Siguiente',more:'Más opciones','prep-stop':'Detener preparación','obs-stop':'Cortar transmisión',status:'Estado','prep-stop!':'Sí, detener preparación','obs-stop!':'Sí, cortar transmisión',menu:'Botones'};
+const LABEL={pause:'Pausar',resume:'Reanudar',next:'Siguiente',more:'Más opciones','prep-stop':'Detener preparación','obs-stop':'Cortar transmisión','obs-start':'Iniciar transmisión',obs:'Transmisión',screen:'Ver pantalla',status:'Estado','prep-stop!':'Sí, detener preparación','obs-stop!':'Sí, cortar transmisión','obs-start!':'Sí, iniciar transmisión',menu:'Botones'};
 
 // Botones según el estado (ntfy admite 3 por aviso). El botón de destino es el tema de órdenes.
-function panelButtons(st,{more=false}={}){
-  if(more)return['prep-stop','obs-stop','status'];
+// Menús: principal → [Pausar|Reanudar] [Siguiente] [Más opciones]; más → [Ver pantalla] [Transmisión] [Detener
+// preparación]; transmisión → [Iniciar transmisión] [Cortar transmisión] [Estado].
+function panelButtons(st,{menu='main',more=false}={}){
+  if(more||menu==='more')return['screen','obs','prep-stop'];
+  if(menu==='obs')return['obs-start','obs-stop','status'];
   return[st.emissionRunning&&st.emissionPaused?'resume':'pause','next','more'];
 }
 
@@ -90,9 +97,20 @@ class RemoteNtfy{
     try{const j=await r.json();if(j?.id){this.ownIds.add(j.id);if(this.ownIds.size>200)this.ownIds.delete(this.ownIds.values().next().value);}}catch{}
     return true;
   }
-  async panel(title,{more=false,extra=''}={}){
+  async panel(title,{more=false,menu='main',extra=''}={}){
     const st=snapshot(this.api);
-    return this.publish({title,message:[extra,describe(st)].filter(Boolean).join('\n'),buttons:panelButtons(st,{more})});
+    return this.publish({title,message:[extra,describe(st)].filter(Boolean).join('\n'),buttons:panelButtons(st,{more,menu})});
+  }
+  // captura de la salida como adjunto (PUT con los parámetros en la URL: admite tildes sin codificar cabeceras)
+  async screenshot(){
+    const f=await this.api?.monitorFrame?.();
+    if(!f?.ok||!f.dataUrl)return this.panel('No se pudo capturar la pantalla',{extra:f?.error||f?.message||'La salida no respondió.'});
+    const c=this.cfg(),m=String(f.dataUrl).match(/^data:image\/(png|jpe?g);base64,(.+)$/);if(!m)return this.panel('No se pudo capturar la pantalla');
+    const q=new URLSearchParams({title:'📺 Al aire ahora',message:describe(snapshot(this.api)),tags:`${OWN_TAG},tv`,filename:`gec-pantalla.${m[1]==='png'?'png':'jpg'}`});
+    const r=await this.fetch(`${this.base(c)}/${c.topic}?${q}`,{method:'PUT',headers:this.headers(c),body:Buffer.from(m[2],'base64')});
+    if(!r.ok){const t=await r.text().catch(()=>'');throw new Error(`ntfy respondió ${r.status}${t?': '+t.slice(0,160):''}`);}
+    try{const j=await r.json();if(j?.id)this.ownIds.add(j.id);}catch{}
+    return true;
   }
   // ---- ejecutar una orden ya validada
   async run(c){
@@ -115,6 +133,16 @@ class RemoteNtfy{
       case 'prep-stop!':
         if(!a.processingRunning)return this.panel('La preparación ya estaba detenida');
         await a.stopProcessing();return this.panel('⏹ Preparación detenida');
+      case 'obs-start':return this.publish({title:'¿Iniciar la transmisión de YouTube?',message:'OBS empieza a transmitir con su configuración actual.',buttons:['obs-start!','status'],priority:4});
+      case 'obs-start!':{
+        const s=global.__gecScheduleLab33;if(!s?.obsOps)return this.panel('No se pudo iniciar',{extra:'OBS no está configurado en GEC (pestaña Salida → OBS / YouTube).'});
+        let r;try{r=await s.obsOps.start();}catch(e){return this.panel('No se pudo iniciar la transmisión',{extra:String(e?.message||e)});}
+        try{await s.refreshObs?.();s.push?.();}catch{}
+        return this.panel(r?.alreadyStreaming?'OBS ya estaba transmitiendo':'🔴 Transmisión iniciada');}
+      case 'obs':
+        try{await global.__gecScheduleLab33?.refreshObs?.();}catch{}
+        return this.panel('Transmisión de YouTube',{menu:'obs'});
+      case 'screen':return this.screenshot();
       case 'obs-stop':return this.publish({title:'¿Cortar la transmisión de YouTube?',message:'OBS deja de transmitir. La emisión de GEC sigue igual.',buttons:['obs-stop!','status'],priority:4});
       case 'obs-stop!':{
         const s=global.__gecScheduleLab33;if(!s?.obsOps)return this.panel('No se pudo cortar',{extra:'OBS no está configurado en GEC (pestaña Salida → OBS / YouTube).'});
@@ -135,7 +163,7 @@ class RemoteNtfy{
     if(msg.id)this.lastId=msg.id;
     if(this.ownIds.has(msg.id)||(Array.isArray(msg.tags)&&msg.tags.includes(OWN_TAG)))return;
     // mensajes viejos (reconexión, reintentos de la app): no se ejecutan
-    if(Number(msg.time)&&this.now()/1000-Number(msg.time)>120)return;
+    if(Number(msg.time)&&Date.now()/1000-Number(msg.time)>120)return;
     const c=this.cfg(),text=String(msg.message||'');
     const btn=parseButton(text,c.key);
     let cmd='';
@@ -178,12 +206,57 @@ class RemoteNtfy{
     };
     loop();
   }
-  // ---- avisos automáticos: cuando la emisión empieza o termina
+  // ---- avisos automáticos (se llama cada 4 s)
   watch(){
     const st=snapshot(this.api),prev=this.prev;this.prev=st;const c=this.cfg();
-    if(!prev||!c.enabled||!c.topic||c.notifyStart===false)return;
-    if(!prev.emissionRunning&&st.emissionRunning)this.panel('▶ Emisión iniciada').catch(e=>this.log('REMOTE_ERROR',e.message||e));
-    else if(prev.emissionRunning&&!st.emissionRunning)this.publish({title:'⏹ Emisión detenida',message:describe(st)}).catch(e=>this.log('REMOTE_ERROR',e.message||e));
+    const fail=e=>this.log('REMOTE_ERROR',e?.message||e);
+    if(!c.enabled||!c.topic){this.piece=null;return;}
+    this.watchStuck(st);this.watchObs();this.watchSchedule();
+    if(!prev||c.notifyStart===false)return;
+    if(!prev.emissionRunning&&st.emissionRunning)this.panel('▶ Emisión iniciada').catch(fail);
+    else if(prev.emissionRunning&&!st.emissionRunning)this.publish({title:'⏹ Emisión detenida',message:describe(st)}).catch(fail);
+  }
+  // salida trabada: la pieza al aire lleva bastante más de lo que dura (sin contar el tiempo en pausa).
+  // Margen amplio: Merlín puede decir una intervención o los titulares (hasta ~60 s) antes de la noticia.
+  watchStuck(st){
+    const a=this.api?.automation?.()||{},now=this.now(),kind=String(a.currentKind||'none');
+    if(!a.emissionRunning||!['news','canned','ad'].includes(kind)){this.piece=null;return;}
+    const key=`${kind}:${a.currentItem?.id||a.currentCanned?.path||st.title}`;
+    if(!this.piece||this.piece.key!==key){
+      const dur=kind==='news'?Number(a.currentItem?.audio?.durationSec||a.currentItem?.result?.durationSec||0):Number(a.currentCanned?.durationSec||0);
+      this.piece={key,kind,title:st.title,expected:dur,active:0,last:now,alerts:0};return;
+    }
+    const p=this.piece;if(!a.emissionPaused)p.active+=Math.max(0,now-p.last);p.last=now;
+    if(!(p.expected>0))return;
+    const limit=(p.expected*1.1+75)*1000;
+    if((p.alerts===0&&p.active>limit)||(p.alerts===1&&p.active>limit+300000)){
+      p.alerts++;const what={news:'La noticia',canned:'El contenido',ad:'El anuncio'}[kind];
+      const mins=s=>s>=90?`${Math.round(s/60)} min`:`${Math.round(s)} s`;
+      this.publish({title:'⚠ La salida parece trabada',message:`${what}${p.title?` «${p.title}»`:''} lleva ${mins(p.active/1000)} al aire y debía durar ~${mins(p.expected)}.\n${describe(st)}`,buttons:['next','screen','status'],priority:5,tags:['warning']})
+        .catch(e=>this.log('REMOTE_ERROR',e?.message||e));
+      this.log('REMOTE',`aviso: salida trabada (${key})`);
+    }
+  }
+  // transmisión cortada sin que nadie la cortara (GEC, el horario o el control remoto marcan lastObsAction)
+  watchObs(){
+    const s=global.__gecScheduleLab33;if(!s?.engine)return;
+    this.obsTick=(this.obsTick||0)+1;
+    const configured=(()=>{try{return fs.existsSync(path.join(this.api.dataDir(),'obs-websocket.json'));}catch{return false;}})();
+    if(configured&&this.obsTick%8===0&&s.refreshObs&&!this.obsBusy){this.obsBusy=true;Promise.resolve(s.refreshObs()).catch(()=>{}).finally(()=>{this.obsBusy=false;});}
+    const o=s.engine.obsState||{},streaming=!!o.streaming,was=this.obsStreaming;this.obsStreaming=streaming;
+    if(was===true&&!streaming&&this.now()-(this.lastObsAction||0)>90000){
+      this.publish({title:'⚠ Se cortó la transmisión de YouTube',message:`${o.connected?'OBS dejó de transmitir sin que GEC lo pidiera.':`OBS no responde${o.error?`: ${o.error}`:''}.`}\n${describe(snapshot(this.api))}`,buttons:['obs-start','screen','status'],priority:5,tags:['warning']})
+        .catch(e=>this.log('REMOTE_ERROR',e?.message||e));
+      this.log('REMOTE','aviso: transmisión cortada');
+    }
+  }
+  // errores del horario automático (por ejemplo, OBS no arrancó a la hora de emitir)
+  watchSchedule(){
+    const msg=String(global.__gecScheduleLab33?.engine?.message||''),was=this.schedMsg;this.schedMsg=msg;
+    if(was===undefined||!msg||msg===was)return;
+    const obs=/obs|transmisi|youtube/i.test(msg);
+    this.publish({title:obs?'⚠ La transmisión no arrancó':'⚠ Aviso del horario',message:`${msg}\n${describe(snapshot(this.api))}`,buttons:obs?['obs-start','screen','status']:['status'],priority:obs?5:4,tags:['warning']})
+      .catch(e=>this.log('REMOTE_ERROR',e?.message||e));
   }
 }
 
@@ -224,6 +297,9 @@ function installRemoteNtfyLab35({api=globalThis.__gecScheduleApi,electron=null,f
   });
   handle('remote:newTopic',()=>{const cur=raw();writeJson(file(),{...cur,topic:randomTopic(),key:randomKey()});engine.start();return view();});
   handle('remote:test',async()=>{try{await engine.panel('✅ GEC conectado',{extra:'Los botones de abajo controlan la emisión.'});return{...view(),ok:true};}catch(e){return{...view(),ok:false,error:String(e?.message||e)};}});
+  // cada inicio o corte de OBS pedido desde GEC (panel, horario o este control) no cuenta como "se cortó solo"
+  const ops=global.__gecScheduleLab33?.obsOps;
+  if(ops&&!ops.__gecLab35){for(const k of ['start','stop']){const base=ops[k];if(typeof base==='function')ops[k]=function(...x){engine.lastObsAction=engine.now();return base.apply(this,x);};}Object.defineProperty(ops,'__gecLab35',{value:true});}
   if(startTimer){setTimeout(()=>engine.start(),6000).unref?.();const t=setInterval(()=>{try{engine.watch();}catch{}},4000);t.unref?.();}
   global.__gecRemoteNtfyLab35={engine,readConfig};
   return global.__gecRemoteNtfyLab35;

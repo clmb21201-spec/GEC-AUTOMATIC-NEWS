@@ -1,14 +1,14 @@
 'use strict';
 // Lab.35 · Tarjeta "Control desde el celular (ntfy)" en la pestaña Salida, debajo de OBS / YouTube.
 // El operador instala la app ntfy, se suscribe al tema que muestra la tarjeta y recibe avisos con botones:
-// pausar / reanudar, siguiente, detener la preparación y cortar la transmisión.
+// pausar / reanudar, siguiente, ver pantalla, detener la preparación e iniciar / cortar la transmisión; y alertas.
 (function installRemoteNtfyLab35(){
   if (window.__gecRemoteNtfyLab35) return; window.__gecRemoteNtfyLab35 = true;
   const api = window.ECAPI;
   if (!api || typeof api.remoteGet !== 'function') return;
   const $ = s => document.querySelector(s);
   const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
-  const CMD = {pause: 'pausar', resume: 'reanudar', next: 'siguiente', 'prep-stop': 'detener preparación', 'obs-stop': 'cortar transmisión', status: 'estado', menu: 'botones', more: 'más opciones'};
+  const CMD = {pause: 'pausar', resume: 'reanudar', next: 'siguiente', 'prep-stop': 'detener preparación', 'obs-stop': 'cortar transmisión', 'obs-start': 'iniciar transmisión', obs: 'transmisión', screen: 'ver pantalla', status: 'estado', menu: 'botones', more: 'más opciones'};
   let info = null;
 
   const css = document.createElement('style');
@@ -28,7 +28,7 @@
     if (!card) {
       card = document.createElement('div'); card.id = 'gecRemoteCard'; card.className = anchor.className; card.style.marginTop = '16px';
       card.innerHTML = `<div class="section-head"><h3>Control desde el celular (ntfy)</h3><span id="gecRemotePill" class="status-pill neutral">DESACTIVADO</span></div>
-        <p class="note">Instala la app <b>ntfy</b> en el celular y suscríbete al tema de abajo. Te llegan avisos con botones para pausar, pasar a la siguiente, detener la preparación y cortar la transmisión. También puedes escribir órdenes con el PIN, por ejemplo «pausar 1234».</p>
+        <p class="note">Instala la app <b>ntfy</b> en el celular y suscríbete al tema de abajo. Te llegan avisos con botones para pausar, pasar a la siguiente, ver la pantalla, detener la preparación e iniciar o cortar la transmisión, y alertas si la salida se traba o la transmisión se corta. También puedes escribir órdenes con el PIN, por ejemplo «pausar 1234».</p>
         <div class="gec-row2">
           <div><label for="gecRemoteTopic">Tema (suscríbete a este en la app)</label><div class="gec-topic"><input id="gecRemoteTopic" readonly><button type="button" class="dark compact" id="gecRemoteCopy">Copiar</button></div></div>
           <div><label for="gecRemotePin">PIN para órdenes escritas</label><input id="gecRemotePin" type="password" autocomplete="off" placeholder="4 a 12 letras o números"></div>
