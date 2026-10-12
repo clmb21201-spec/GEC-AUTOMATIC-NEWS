@@ -48,4 +48,5 @@ if(!gotLock){app.quit();}else{
   require('./services/documentCodesSpeechLab32').installDocumentCodesSpeechLab32({dataRoot:require('./services/releaseV2GlobalOptimizationLab29').dataRoot});
   require('./services/broadcastScheduleLab33').installBroadcastScheduleLab33();
   require('./services/ttsRunawayGuardLab34').installTtsRunawayGuardLab34();
+  require('./services/remoteNtfyLab35').installRemoteNtfyLab35();
 }

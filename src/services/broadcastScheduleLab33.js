@@ -140,7 +140,7 @@ function installBroadcastScheduleLab33({api=globalThis.__gecScheduleApi,obsOps:o
   handle('obs:test',async()=>{const st=await refreshObs();push();return{ok:!!st.connected,state:st};});
   handle('obs:start',async()=>{try{const r=await obsOps.start();await refreshObs();push();return{ok:true,...r};}catch(e){return{ok:false,error:String(e.message||e)};}});
   handle('obs:stop',async()=>{try{const r=await obsOps.stop();await refreshObs();push();return{ok:true,...r};}catch(e){return{ok:false,error:String(e.message||e)};}});
-  global.__gecScheduleLab33={engine,loop,refreshObs};
+  global.__gecScheduleLab33={engine,loop,refreshObs,obsOps,push};
   return global.__gecScheduleLab33;
 }
 

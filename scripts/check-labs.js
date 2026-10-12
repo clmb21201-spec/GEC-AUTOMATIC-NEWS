@@ -16,6 +16,10 @@ const STEPS=[
   ['scripts/check-tts-runaway-lab34.js'],
   {py:['-m','py_compile','src/qwen_runaway_lab34.py']},
   {py:['scripts/check-qwen-runaway-lab34.py']},
+  // Lab.35 · control desde el celular con ntfy
+  ['--check','src/services/remoteNtfyLab35.js'],
+  ['--check','src/renderer-remote-ntfy-lab35.js'],
+  ['scripts/check-remote-ntfy-lab35.js'],
 ];
 // Python: el mismo "python" que usa package.json (en Linux puede llamarse python3)
 function runPython(args){

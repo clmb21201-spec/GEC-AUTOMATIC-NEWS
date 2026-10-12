@@ -96,6 +96,13 @@ Ver `INTEGRACION_MERLIN.md`, sección "Modelo y animación". Opciones nuevas en 
 - `services/ttsRunawayGuardLab34.js` (se instala al final de `bootstrap-v2lab.js`): registra cada caso en `logs/tts-runaway.log` (carpeta de datos) y, como último control, si el audio completo dura más de 2 × lo esperado + 10 s (mínimo 20 s) lo borra y lanza `TTS_RUNAWAY` (error de voz: la noticia no sale al aire con ruido); en mediciones (`benchmarkSeed`) solo registra.
 - Pruebas: `scripts/check-qwen-runaway-lab34.py` (la detección solo si hay numpy) y `scripts/check-tts-runaway-lab34.js`, en `scripts/check-labs.js` (que ahora también corre pasos de Python).
 
+## Lab.35 (control desde el celular con ntfy)
+
+- `services/remoteNtfyLab35.js` (se instala al final de `bootstrap-v2lab.js`; usa `global.__gecScheduleApi` y, para OBS, `global.__gecScheduleLab33.obsOps`): GEC solo hace conexiones de salida al servidor ntfy (por defecto https://ntfy.sh), así que funciona fuera de la oficina sin abrir puertos. Publica en el tema de avisos (aleatorio, `gec-…`; el operador se suscribe en la app ntfy) mensajes con hasta 3 botones `http` que hacen POST al tema oculto `<tema>-cmd` con `{"gec":<clave>,"c":<orden>}`; escucha los dos temas por stream JSON (`/<tema>,<tema>-cmd/json?since=…`, reconexión con espera creciente) e ignora sus propios avisos (etiqueta `gec`), los de más de 2 min y los botones con otra clave.
+- Órdenes: pausar / reanudar (`pauseEmission` / `resumeEmission`), siguiente (`skipCurrent`), detener la preparación (`stopProcessing`) y cortar la transmisión de OBS (`obsOps.stop`); las dos últimas piden confirmación con un segundo botón. También `estado` y `más opciones`. Órdenes escritas en el tema de avisos solo con el PIN («pausar 1234»); sin PIN responde «Falta el PIN». Al iniciar o terminar la emisión manda el panel de botones (opción `notifyStart`).
+- `remote-ntfy.json` (carpeta de datos): servidor, tema, clave de botones, PIN y token (cifrados con `safeStorage`). "Generar tema nuevo" cambia tema y clave (los botones viejos dejan de valer). IPC `remote:get|set|test|newTopic`; evento `remote:state`.
+- Panel: tarjeta "Control desde el celular (ntfy)" en la pestaña Salida, debajo de OBS / YouTube (`renderer-remote-ntfy-lab35.js`). Prueba: `scripts/check-remote-ntfy-lab35.js` (servidor ntfy simulado en local).
+
 ## Pendiente
 
 - Integrar en modo Merlín el envío por NDI (hoy NDI queda bloqueado con aviso en modo Merlín).
