@@ -11,9 +11,19 @@ const STEPS=[
   ['--check','src/services/broadcastScheduleLab33.js'],
   ['--check','src/renderer-schedule-lab33.js'],
   ['scripts/check-broadcast-schedule-lab33.js'],
+  // Lab.34 · voz de Qwen que no se detiene (tope por texto, regenerar o recortar, control antes de emitir)
+  ['--check','src/services/ttsRunawayGuardLab34.js'],
+  ['scripts/check-tts-runaway-lab34.js'],
+  {py:['-m','py_compile','src/qwen_runaway_lab34.py']},
+  {py:['scripts/check-qwen-runaway-lab34.py']},
 ];
-for(const args of STEPS){
-  const r=spawnSync(process.execPath,args,{cwd:root,stdio:'inherit'});
-  if(r.status!==0){console.error(`check-labs: falló "node ${args.join(' ')}"`);process.exit(r.status||1);}
+// Python: el mismo "python" que usa package.json (en Linux puede llamarse python3)
+function runPython(args){
+  for(const exe of [process.env.PYTHON,'python','python3'].filter(Boolean)){const r=spawnSync(exe,args,{cwd:root,stdio:'inherit'});if(!r.error)return{exe,r};}
+  return{exe:'python',r:{status:1}};
+}
+for(const step of STEPS){
+  const {exe,r}=Array.isArray(step)?{exe:'node',r:spawnSync(process.execPath,step,{cwd:root,stdio:'inherit'})}:runPython(step.py),args=Array.isArray(step)?step:step.py;
+  if(r.status!==0){console.error(`check-labs: falló "${exe} ${args.join(' ')}"`);process.exit(r.status||1);}
 }
 console.log(`check-labs OK (${STEPS.length} pasos)`);

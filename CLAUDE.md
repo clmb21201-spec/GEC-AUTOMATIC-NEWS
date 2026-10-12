@@ -88,6 +88,14 @@ Ver `INTEGRACION_MERLIN.md`, sección "Modelo y animación". Opciones nuevas en 
 - `services/obsWebSocketLab33.js`: cliente obs-websocket v5 con el WebSocket nativo (Electron 43 / Node 24), sin dependencias. OBS en la misma PC: `ws://127.0.0.1:4455`. Conexión en `obs-websocket.json` (contraseña cifrada con `safeStorage`).
 - Panel (`renderer-schedule-lab33.js`): pastilla junto a OUTPUT en la barra superior (próximo horario o estado; no agrega alto a ninguna pestaña), ventana "Horario automático" (AM/PM) y tarjeta "OBS / YouTube" en la pestaña Salida, debajo de Salida NDI®. IPC `schedule:get|set|state`, `obs:get|set|test|start|stop`; evento `schedule:state`. Prueba: `scripts/check-broadcast-schedule-lab33.js`.
 
+## Lab.34 (voz de Qwen que no se detiene)
+
+- Síntoma: al terminar una noticia seguía un zumbido grave y distorsionado (encima de la música) y la salida no pasaba a la siguiente. Qwen3-TTS a veces no marca el fin de la locución y genera ruido hasta `max_new_tokens` (antes 2048 fijos = 2 min 44 s por fragmento); ese ruido quedaba dentro del WAV de la noticia.
+- `src/qwen_runaway_lab34.py` (lo copia `prepare-windows-runtime.ps1` junto al worker): `max_new_tokens(text)` = tope acorde al texto (~1,15 × `limit_sec`, sin pasar de 2048); `inspect` marca el fragmento descontrolado (`tope`: llegó al tope; `largo`: más de 2 × lo esperado + 6 s, a 14 caracteres/s; `cola`: más de 2,5 s sin voz al final, con voz = energía y ≥ 35 % en 300–3400 Hz); `cut` corta donde termina la voz (o, si el ruido parece voz, en la última pausa antes de 1,5 × lo esperado + 2 s).
+- `tts_lab_worker.py`: `_lab34_cap` en las tres llamadas de Qwen (lote, fine-tuned, zero-shot); `fix_runaway` revisa cada fragmento en los dos caminos (lotes y uno por uno), lo regenera una vez con otra semilla y, si vuelve a fallar, recorta el mejor. Se omite en `batchBenchmarkMode`. El resultado trae `runaway` (lista de casos).
+- `services/ttsRunawayGuardLab34.js` (se instala al final de `bootstrap-v2lab.js`): registra cada caso en `logs/tts-runaway.log` (carpeta de datos) y, como último control, si el audio completo dura más de 2 × lo esperado + 10 s (mínimo 20 s) lo borra y lanza `TTS_RUNAWAY` (error de voz: la noticia no sale al aire con ruido); en mediciones (`benchmarkSeed`) solo registra.
+- Pruebas: `scripts/check-qwen-runaway-lab34.py` (la detección solo si hay numpy) y `scripts/check-tts-runaway-lab34.js`, en `scripts/check-labs.js` (que ahora también corre pasos de Python).
+
 ## Pendiente
 
 - Integrar en modo Merlín el envío por NDI (hoy NDI queda bloqueado con aviso en modo Merlín).
