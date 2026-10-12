@@ -20,6 +20,10 @@ const STEPS=[
   ['--check','src/services/remoteNtfyLab35.js'],
   ['--check','src/renderer-remote-ntfy-lab35.js'],
   ['scripts/check-remote-ntfy-lab35.js'],
+  // Lab.36 · audios de voz para edición (.wav + .txt + .srt) y Merlín solo con su página cargada
+  ['--check','src/services/voiceArchiveLab36.js'],
+  ['--check','src/renderer-voice-archive-lab36.js'],
+  ['scripts/check-voice-archive-lab36.js'],
 ];
 // Python: el mismo "python" que usa package.json (en Linux puede llamarse python3)
 function runPython(args){

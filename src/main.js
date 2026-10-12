@@ -336,7 +336,10 @@ const presenterHost=(()=>{
   function voiceKey(){const s=settingsStore?.load?.()||{};return JSON.stringify({voice:s.tts?.voice||'',speed:s.tts?.speed||1,engine:s.tts?.engine||s.tts?.primaryEngine||''});}
   function fileFor(text){return path.join(cacheDir(),crypto.createHash('sha1').update(voiceKey()+'|'+text).digest('hex').slice(0,16)+'.wav');}
   const ready=f=>{try{return fs.statSync(f).size>1000;}catch{return false;}};
-  const active=()=>{try{return readPresenter().mode==='merlin'&&(currentDesign?.()||{}).format!=='9:16';}catch{return false;}};
+  // Merlín solo habla si la salida muestra de verdad su página: si WebGL o el modelo fallan, la salida vuelve a output.html
+  // aunque el modo siga en 'merlin', y la clásica trataba la intervención como una noticia vacía (y su 'ended' como el de la noticia).
+  const merlinPage=()=>{try{const w=typeof outputWindow!=='undefined'?outputWindow:null;if(!w||w.isDestroyed())return true;const u=String(w.webContents.getURL()||'');return !u||/output-merlin\.html/i.test(u);}catch{return true;}};
+  const active=()=>{try{return readPresenter().mode==='merlin'&&(currentDesign?.()||{}).format!=='9:16'&&merlinPage();}catch{return false;}};
   async function ensureClips(){if(generating)return generating;if(!kokoro||!settingsStore)return;generating=(async()=>{const ph=loadPhrases();fs.mkdirSync(cacheDir(),{recursive:true});
     for(const seg of SEGS)for(const text of ph[seg]){const f=fileFor(text);if(ready(f))continue;
       try{const s=settingsStore.load(),a=await kokoro.generate(text,{voice:s.tts.voice,speed:s.tts.speed});if(a?.path&&fs.existsSync(a.path)){fs.copyFileSync(a.path,f);durations[f]=Number(a.durationSec)||0;try{kokoro.cleanupAudio?.(a.path);}catch{}}}

@@ -104,6 +104,11 @@ Ver `INTEGRACION_MERLIN.md`, sección "Modelo y animación". Opciones nuevas en 
 - `remote-ntfy.json` (carpeta de datos): servidor, tema, clave de botones, PIN y token (cifrados con `safeStorage`). "Generar tema nuevo" cambia tema y clave (los botones viejos dejan de valer). IPC `remote:get|set|test|newTopic`; evento `remote:state`.
 - Panel: tarjeta "Control desde el celular (ntfy)" en la pestaña Salida, debajo de OBS / YouTube (`renderer-remote-ntfy-lab35.js`). Prueba: `scripts/check-remote-ntfy-lab35.js` (servidor ntfy simulado en local).
 
+## Lab.36 (audios de voz para edición)
+
+- `services/voiceArchiveLab36.js` (se instala al final de `bootstrap-v2lab.js`): envuelve `removeItem` de la automatización (donde está definido en la cadena de prototipos de la instancia; reintenta si todavía no existe) y, solo para noticias con estado `EMITIDA` (vale para la salida clásica y para Merlín), copia el WAV del TTS antes de que se borre: solo la voz, la música se mezcla en la salida. Carpeta `<carpeta>/AAAA-MM-DD/HH-MM-SS · Titular.{wav,txt,srt}` (por defecto `Documentos/GEC Audios de voz`); el .txt (UTF-8 con BOM) trae titular, bajada, categoría, fuente, enlace, fechas, duración, el guion de la IA y la locución exacta (`ttsScript`); el .srt usa los tramos con voz del WAV (PCM 16 bits o float 32), bloques de hasta 2 líneas de ~42 caracteres cortados en fin de oración / comas, con los cortes anclados a la pausa más cercana. Limpieza opcional por días (solo carpetas `AAAA-MM-DD` y archivos .wav/.txt/.srt). Configuración en `voice-archive.json`; IPC `voiceArchive:get|set|pick|open`; evento `voiceArchive:state`. Panel: tarjeta en Ajustes, debajo de la de Voz (`renderer-voice-archive-lab36.js`). Prueba: `scripts/check-voice-archive-lab36.js`.
+- Merlín solo con su página: `presenterHost.active()` además exige que la ventana de salida muestre `output-merlin.html` (`merlinPage()`). Si WebGL o el modelo fallan, la salida vuelve a `output.html` con el modo aún en `merlin`; antes las intervenciones de Merlín llegaban a la clásica como una noticia vacía (se oía la voz de Merlín) y su `ended` se tomaba como el fin de la noticia real.
+
 ## Pendiente
 
 - Integrar en modo Merlín el envío por NDI (hoy NDI queda bloqueado con aviso en modo Merlín).
