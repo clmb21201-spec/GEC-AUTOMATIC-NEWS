@@ -22,6 +22,11 @@ try:
     import qwen_speed_lab31 as LAB31
 except Exception:
     LAB31 = None
+# Lab.34: tope de pasos según el texto y detección del fragmento que no se detiene (qwen_runaway_lab34.py, junto al worker).
+try:
+    import qwen_runaway_lab34 as RUNAWAY
+except Exception:
+    RUNAWAY = None
 
 ENGINE = sys.argv[1] if len(sys.argv) > 1 else ""
 MODEL = None
@@ -927,6 +932,15 @@ def _qwen_generation_options(params, stable_mode, temperature):
     }
 
 
+def _lab34_cap(generation, texts):
+    """Lab.34: max_new_tokens acorde al texto más largo (antes 2048 fijos = 2 min 44 s de ruido posible). Devuelve el tope en s."""
+    if RUNAWAY is None:
+        return 0.0
+    items = list(texts) if isinstance(texts, (list, tuple)) else [texts]
+    generation["max_new_tokens"] = max(RUNAWAY.max_new_tokens(t, generation.get("max_new_tokens") or 2048) for t in items)
+    return generation["max_new_tokens"] / RUNAWAY.FRAME_HZ
+
+
 def _qwen_finalize_diag(model, wavs, sr, call_timings, model_load_ms=0, prompt_ms=0, numpy_ms=0, non_streaming=True, params=None):
     total_audio_sec = sum(len(np.asarray(w)) for w in wavs) / float(sr) if sr else 0.0
     core = getattr(model, "model", None)
@@ -968,6 +982,7 @@ def generate_qwen_finetuned_batch(texts, params, model_path, speaker):
     temperature = max(0.10, min(1.50, production_temperature))
     non_streaming = True if perf["nonStreamingMode"] is None else bool(perf["nonStreamingMode"])
     generation = _qwen_generation_options(params, stable_mode, temperature)
+    cap_sec = _lab34_cap(generation, texts)
     model_load_ms = round((time.perf_counter() - started) * 1000)
 
     def qwen_call():
@@ -994,6 +1009,7 @@ def generate_qwen_finetuned_batch(texts, params, model_path, speaker):
         prompt_ms=0, numpy_ms=0, non_streaming=non_streaming, params=params,
     )
     diag["batch_size"] = len(texts)
+    diag["lab34_cap_sec"] = cap_sec
     diag["piece_total_ms"] = round((time.perf_counter() - started) * 1000)
     return arrays, int(sr), diag
 
@@ -1180,6 +1196,7 @@ def generate_piece(text, ref_audio, ref_text, cache_path, style, params, qwen_mo
             stable_mode = str(params.get("consistencyMode") or "") == "stable-v1"
             non_streaming = True if perf["nonStreamingMode"] is None else bool(perf["nonStreamingMode"])
             generation = _qwen_generation_options(params, stable_mode, temperature)
+            cap_sec = _lab34_cap(generation, text)
             model_load_ms = round((time.perf_counter() - model_load_started) * 1000)
             def qwen_call():
                 with torch.inference_mode():
@@ -1202,6 +1219,7 @@ def generate_piece(text, ref_audio, ref_text, cache_path, style, params, qwen_mo
             stable_mode = str(params.get("consistencyMode") or "automatic") in ("automatic", "stable-v1")
             non_streaming = False if perf["nonStreamingMode"] is None else bool(perf["nonStreamingMode"])
             generation = _qwen_generation_options(params, stable_mode, temperature)
+            cap_sec = _lab34_cap(generation, text)
             model_load_ms = round((time.perf_counter() - model_load_started) * 1000)
             prompt_started = time.perf_counter()
             prompt = qwen_prompt(ref_audio, ref_text, cache_path, params)
@@ -1229,6 +1247,7 @@ def generate_piece(text, ref_audio, ref_text, cache_path, style, params, qwen_mo
         )
         diag["piece_total_ms"] = round((time.perf_counter() - piece_started) * 1000)
         diag["batch_size"] = 1
+        diag["lab34_cap_sec"] = cap_sec
         return arr, int(sr), diag
 
     raise RuntimeError("Motor no soportado")
@@ -1315,6 +1334,59 @@ def generate(payload):
         except Exception:
             pass
 
+    # Lab.34: si un fragmento de Qwen no se detuvo (ruido grave al final hasta el tope de pasos), se regenera con otra
+    # semilla; si vuelve a fallar, se queda el mejor de los dos cortado donde termina la voz. Todo queda en "runaway".
+    runaway_events = []
+    runaway_on = ENGINE == "qwen3tts" and RUNAWAY is not None and not bool(params.get("batchBenchmarkMode"))
+
+    def fix_runaway(idx, part, audio_item, sr, cap_sec):
+        if not runaway_on or not sr or audio_item is None or not len(audio_item):
+            return audio_item
+        try:
+            first = RUNAWAY.inspect(audio_item, sr, part, cap_sec or 0)
+        except Exception:
+            return audio_item
+        if not first["runaway"]:
+            return audio_item
+        event = {"chunk": idx + 1, "chars": len(part), **first, "action": ""}
+        emit({"type": "progress", "id": request_id, "phase": "runaway-retry", "chunk": idx + 1, "chunks": len(text_chunks),
+              "label": f"El fragmento {idx + 1} no se detuvo ({first['audio_sec']} s para ~{first['expected_sec']} s); regenerando…"})
+        best, best_info = audio_item, first
+        stop_beat = threading.Event()
+        def retry_heartbeat():
+            while not stop_beat.wait(8):
+                emit({"type": "progress", "id": request_id, "phase": "runaway-heartbeat", "chunk": idx + 1, "chunks": len(text_chunks),
+                      "label": f"Regenerando fragmento {idx + 1}/{len(text_chunks)}…"})
+        beat = threading.Thread(target=retry_heartbeat, daemon=True)
+        beat.start()
+        try:
+            retry_seed = ((active_seed or int(time.time() * 1000)) + 7919 * (idx + 1)) % (2**31 - 1) or 1
+            apply_seed(retry_seed)
+            again, sr2, again_diag = generate_piece(part, ref_audio, ref_text, cache_path, style, params, qwen_mode, model_path, speaker)
+            if int(sr2) == int(sr):
+                second = RUNAWAY.inspect(again, sr, part, again_diag.get("lab34_cap_sec") or 0)
+                event["retry"] = {"seed": retry_seed, **second}
+                if not second["runaway"]:
+                    event["action"] = "regenerado"
+                    runaway_events.append(event)
+                    return again
+                if RUNAWAY.score(second) < RUNAWAY.score(first):
+                    best, best_info = again, second
+        except Exception as e:
+            event["retry_error"] = str(e)[:300]
+        finally:
+            stop_beat.set()
+            beat.join(timeout=1)
+        try:
+            out = RUNAWAY.cut(best, sr, best_info)
+        except Exception as e:
+            event["cut_error"] = str(e)[:300]
+            out = best
+        event["action"] = "recortado"
+        event["final_sec"] = round(len(out) / float(sr), 2)
+        runaway_events.append(event)
+        return out
+
     if batch_enabled:
         total_groups = int(math.ceil(len(text_chunks) / float(requested_batch_size)))
         for group_idx, group_start in enumerate(range(0, len(text_chunks), requested_batch_size)):
@@ -1355,6 +1427,7 @@ def generate(payload):
             total_batch_audio_sec = sum((len(a) / float(sr)) for a in audios) if sr else 0.0
             for offset, (part, audio_item) in enumerate(zip(group, audios)):
                 idx = group_start + offset
+                audio_item = fix_runaway(idx, part, audio_item, sr, batch_diag.get("lab34_cap_sec"))
                 chunk_audio_sec = round(len(audio_item) / float(sr), 3) if sr else 0
                 estimated_talker = max(1, int(round(chunk_audio_sec * 12.5))) if chunk_audio_sec else 0
                 chunk_diagnostics.append({
@@ -1419,6 +1492,7 @@ def generate(payload):
                 stop_chunk_beat.set()
                 chunk_beat.join(timeout=1)
             sample_rate = sr
+            audio_item = fix_runaway(idx, part, audio_item, sr, piece_diag.get("lab34_cap_sec"))
             chunk_elapsed_ms = round((time.perf_counter() - chunk_started) * 1000)
             chunk_audio_sec = round(len(audio_item) / float(sr), 3) if sr else 0
             chunk_diagnostics.append({
@@ -1504,6 +1578,7 @@ def generate(payload):
         "chunk_mode": qwen_runtime_params(params)["chunkMode"] if ENGINE == "qwen3tts" else "",
         "chunk_chars": [len(x) for x in text_chunks],
         "join": join_diag,
+        "runaway": runaway_events,
         "predictor_cuda_graphs": (LAB31.predictor_graphs_status(MODEL) if (ENGINE == "qwen3tts" and LAB31 is not None and MODEL is not None) else {}),
         "stage_timings": {
             "setup_ms": setup_ms,
