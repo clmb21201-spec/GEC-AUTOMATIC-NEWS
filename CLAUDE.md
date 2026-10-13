@@ -134,6 +134,47 @@ Ver `INTEGRACION_MERLIN.md`, sección "Modelo y animación". Opciones nuevas en 
 - Claude: `claude-haiku-5-5` (antes `claude-haiku-4-5-20251001`). `claudeBody` le apaga el pensamiento (piensa por defecto y cuenta en `max_tokens`) y sube el tope ~30 % (mismo texto, más fichas); no se envían `temperature` ni prefill. Los ajustes guardados con Haiku 4.5 pasan solos a 5.5.
 - Prueba: `scripts/check-sfx-lab39.js`.
 
+## Lab.40 (vista previa de Noticias con movimiento en el panel)
+
+- La ventana «Colores, ticker y sonidos…» (`renderer-news-motion-lab37.js`) tiene a la derecha la salida real en un iframe (`output-news-motion-preview.html`: `output.js` + versionados + Lab.37 + Lab.39, sin música). `output-news-motion-preview-adapter.js` define un `ECAPI` propio alimentado por `postMessage` (`gec-nm-preview`: `design`, `stories`, `play`, `control`), crea la voz como un WAV mudo con la duración de cada nota, usa fotos de ejemplo en SVG, pasa sola a la siguiente noticia al recibir `ended` (así se ve el golpe de marca) y devuelve `gec-nm-preview-state` (plano y tiempo).
+- Datos: IPC `newsMotion:preview` (`previewStories` en `services/newsMotionLab37.js`): tres noticias de ejemplo (deportes, cifras, exclusiva) con tramos de voz simulados (14 caracteres/s, 0,45 s entre oraciones), el plan real (`buildMotion`) con la configuración que se está editando y el ticker de la cola. El diseño es `getSettings().visual.output` con el formato elegido (16:9 / 9:16) y `newsMotion` de la ventana; el sonido va apagado salvo que se encienda en la barra.
+- `draftFromModal()` arma la configuración tanto para Guardar como para la vista previa; cada cambio la actualiza al instante sin guardar. Al cerrar la ventana el iframe se descarga.
+- Colores del movimiento en modo «Tomar del Diseño»: los selectores muestran los que salen del Diseño (`deriveColors`, misma regla que `applyColors` de la salida) y no los últimos personalizados guardados; al pasar a «Personalizados» se parte de esos.
+- Colores del Diseño que volvían al amarillo: los demás «Guardar» del panel (Audio y locución, Ajustes, probar Claude…) mandan `settings` con la copia de `visual.output.noteDesign` que el panel cargó al abrirse y pisaban lo que había guardado el editor de Diseño. Ahora `settings:save` (main.js) descarta `noteDesign`, `youtubePromoDesign` y `youtubePromoCtaText` salvo que el guardado traiga `__designV2` (lo ponen `renderer-emission-design-v2.js` y el guardado de la promo en `renderer-stabilization-lab28.js`).
+- Prueba: `scripts/check-news-motion-preview-lab40.js`.
+
+## Lab.41 (murmullos de Qwen antes de la primera palabra)
+
+- Síntoma: al inicio de algunas notas (y en la prueba de voz) se oían uno o dos «mmm» y hasta 1 s de silencio antes de la primera palabra; en algunas pausas quedaba un retumbo de 20–70 Hz.
+- `src/qwen_onset_lab41.py` (lo copia `prepare-windows-runtime.ps1` junto al worker): `clean_head(audio, sr)` busca el comienzo de la voz (≥ 0,15 s con ≥ 70 % de cuadros sobre min(-35 dB, p90 − 18 dB) y ≥ 8 % de la energía entre 800 y 5000 Hz) y quita lo anterior solo si es silencio o murmullo: sonidos previos ≤ 0,5 s, con ≤ 10 % de agudos y separados de la voz por ≥ 0,3 s bajo -45 dB; si no, solo recorta el silencio antes del primer sonido. Deja 60 ms antes de la voz, fundido de 10 ms y nunca más de 3 s. `highpass(audio, sr)`: rampa coseno 40–70 Hz por FFT, sin desfase.
+- `tts_lab_worker.py`: `clean_onset` después de `fix_runaway` en los dos caminos (lotes y uno por uno), y el filtro sobre el audio unido antes de escribir el WAV; se omite en `batchBenchmarkMode`. El resultado trae `onset`. `services/ttsRunawayGuardLab34.js` registra los murmullos quitados en `logs/tts-runaway.log`.
+- Prueba: `scripts/check-qwen-onset-lab41.py` (la detección, con señales sintéticas, solo si hay numpy).
+
+## Lab.42 (carpeta de datos e IAs entre versiones del EXE)
+
+- Antes: todo vive en `<carpeta del EXE>\GEC V2 TTS Lab\EC Automatic News Data`; abrir un EXE nuevo desde otra carpeta (Descargas) empezaba de cero y había que bajar las IAs otra vez.
+- `services/dataLocationLab42.js`: puntero en `%APPDATA%\GEC Automatic News\data-location.json` (`lastBase`, `fixed`, `fixedBase`). `resolveStartup` se llama al inicio de `bootstrap-v2lab.js` (solo `app.isPackaged`, antes de fijar `GEC_V2_TTS_LAB_ROOT`): reinicio (variable ya puesta) → esa; carpeta fija → esa; datos junto al EXE → esos; si no, la última carpeta con datos (`source:'remembered'`, aviso en el panel); si no, junto al EXE. «Tiene datos» = perfiles registrados, `models/` o algún `tts-lab/<motor>/site-packages` con contenido. `GEC_V2_EXE_DIR` guarda la carpeta real del EXE para los reinicios.
+- IPC `dataLocation:get|open|pick|set` (`set`: `use` una carpeta que ya tiene datos, `copy` copia los actuales con progreso `dataLocation:progress` sin pisar lo que ya está igual, `local` vuelve a junto al EXE). Antes de cambiar: `profileSwitchSafety0329.stopStrict`, se apagan IA local y voz, y se reinicia con `GEC_V2_TTS_LAB_ROOT` apuntando a la nueva. La carpeta anterior no se borra.
+- Panel: tarjeta «Carpeta de datos e IAs» en Ajustes, debajo de la optimización (`renderer-data-location-lab42.js`). Se ancla a `#ecOptimizer0321` (lo crea `renderer-0321.js` tarde) y espera con un MutationObserver: antes caía en el primer `.card`, dentro de las columnas viejas que Lab.29 oculta, y no se veía. Prueba: `scripts/check-data-location-lab42.js`.
+
+## Lab.43 (el perfil exportado lleva movimiento, sonidos, intervenciones y horario)
+
+- Antes: exportar perfil (`.gecprofile` / `.gecpack`, `services/profilePackage0329.js`) solo llevaba la configuración del perfil (diseño, transiciones, animación de imagen, música, voz, fuentes…); lo que vive en archivos aparte de la carpeta de datos se perdía al importar en otra computadora.
+- `services/profileExtrasLab43.js` (se instala al final de `bootstrap-v2lab.js`, envolviendo `profilePayload`, `allPayload`, `installResources` e `importFile` de `ProfilePackage0329`): agrega `payload.extrasLab43 = {version, profiles: {<id>: {newsMotion, classicHost, schedule}}, skipped}` con `news-motion.json` (movimiento y sonidos), `classic-host.json` (intervenciones; logo y fondo propio como recursos `extras/<id>/classic-host/<archivo>` y en la configuración `@classic-host/<archivo>`; más de 128 MB o faltante → se omite, se avisa en `skipped` y el fondo propio pasa a `anim`) y `broadcast-schedule.json`. Un GEC anterior ignora la clave y esos recursos.
+- Al importar: `installResources` recibe el mapa id original → id nuevo y se guarda; los datos se escriben (normalizados con `normalizeConfig` / `normalizeSchedule`) solo después de que `importFile` terminó bien, con el id nuevo; el logo y el fondo van a `classic-host/<id nuevo>/`. El horario llega **desactivado** (`enabled:false`, con sus franjas) para que otra computadora no empiece a emitir ni a transmitir sola; `result.extrasLab43` trae `applied`, `scheduleDisabled` y `notes`. Si algo falla, la importación del perfil sigue.
+- No viajan (son de cada computadora): modo de salida, OBS, control por ntfy y carpeta de audios de voz.
+- Prueba: `scripts/check-profile-extras-lab43.js` (exporta e importa con el `ProfilePackage0329` real).
+
+## Lab.44 (meta de RTF 0,65 y optimización rápida)
+
+- Antes: la medición de la voz Qwen probaba todas las variantes (base, hidden OFF, top-k 20, top-k 10) aunque la primera ya fuera rápida; no había meta de RTF ni modo corto.
+- `services/optimizationQuickLab44.js` (se instala al final de `bootstrap-v2lab.js`, envolviendo `TTSLabRuntime.prototype.benchmarkQwenPerformance` y `LocalRuntime.prototype.__ec0320BenchmarkCandidates`):
+  - Meta (los dos modos): `options.stopWhen` = `targetReached(results)`. Si lo que se elegiría con lo medido (la base, o una variante comparable —frames y duración ±5 %— y ≥ 5 % más rápida) tiene mediana ≤ 0,65, peor corrida ≤ 0,75 y ≥ 2 corridas, las variantes que faltan se agregan como omitidas (`skipped`, `error` con el motivo) y no se miden. El resultado trae `rtfTarget`, `optimizationMode` y `targetSkipped`.
+  - Rápida (`optimization:setMode 'quick'`, vuelve sola a `full` a las 3 h): voz con 2 corridas por variante y solo base + `subk20` (`candidateIds`), lotes B1 y B4 (`batchSizes`, solo fine-tuned), aceleración del predictor de Lab.31 con 2 corridas (`quickOptimization`); nota típica, corta y prueba de escucha se mantienen. IA de texto: `current`, `gpu-full-balanced` y `gpu-full-fast`. IPC `optimization:setMode|getMode`.
+- Puntos acotados: `ttsLabRuntime.js` (`options.candidateIds`, `options.stopWhen` en el bucle de variantes, `options.batchSizes`), `releaseV2GpuIsolationLab30.js` (respeta un `sampleLimit` menor que 3) y `releaseV2QwenSpeedLab31.js` (`graphRuns`).
+- Panel: botón «Optimización rápida» debajo de «Optimizar EC para esta computadora» y nota de la meta (`renderer-optimization-quick-lab44.js`): pide el modo rápido, hace clic en el botón normal y vuelve a `full` cuando el botón normal se reactiva.
+- Prueba: `scripts/check-optimization-quick-lab44.js` (con el `benchmarkQwenPerformance` real y un motor simulado).
+
 ## Pendiente
 
 - Integrar en modo Merlín el envío por NDI (hoy NDI queda bloqueado con aviso en modo Merlín).

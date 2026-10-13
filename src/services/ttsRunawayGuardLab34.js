@@ -28,6 +28,8 @@ function installTtsRunawayGuardLab34(){
   t.command=async function(id,payload,...rest){
     const r=await baseCommand.call(this,id,payload,...rest);
     try{const evs=Array.isArray(r?.runaway)?r.runaway:[];for(const ev of evs)logLine(this,`${id} · ${describe(ev)} · ${path.basename(String(payload?.output||''))}`);}catch{}
+    // Lab.41: murmullos quitados antes de la primera palabra (y errores de esa limpieza); los recortes de silencio no se registran
+    try{const on=Array.isArray(r?.onset)?r.onset:[];for(const ev of on)if(ev&&(ev.reason==='murmullo'||/^(error|filtro:)/.test(String(ev.reason||''))))logLine(this,`${id} · fragmento ${ev.chunk} · ${ev.reason==='murmullo'?`murmullo de ${Number(ev.murmur_sec||0).toFixed(2)} s quitado antes de la primera palabra (recorte ${Number(ev.cut_sec||0).toFixed(2)} s)`:ev.reason} · ${path.basename(String(payload?.output||''))}`);}catch{}
     return r;
   };
   const baseGenerate=t.generate;

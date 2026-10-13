@@ -39,6 +39,23 @@ const STEPS=[
   ['--check','src/gec-sfx-lab39.js'],
   ['--check','src/output-sfx-lab39.js'],
   ['scripts/check-sfx-lab39.js'],
+  // Lab.40 · vista previa de Noticias con movimiento en la ventana del panel
+  ['--check','src/output-news-motion-preview-adapter.js'],
+  ['scripts/check-news-motion-preview-lab40.js'],
+  // Lab.41 · murmullos de Qwen antes de la primera palabra y retumbo grave en las pausas
+  {py:['-m','py_compile','src/qwen_onset_lab41.py']},
+  {py:['scripts/check-qwen-onset-lab41.py']},
+  // Lab.42 · carpeta de datos e IAs que sobrevive a cada versión nueva del EXE
+  ['--check','src/services/dataLocationLab42.js'],
+  ['--check','src/renderer-data-location-lab42.js'],
+  ['scripts/check-data-location-lab42.js'],
+  // Lab.43 · el perfil exportado lleva movimiento, sonidos, intervenciones (logo y fondo) y horario
+  ['--check','src/services/profileExtrasLab43.js'],
+  ['scripts/check-profile-extras-lab43.js'],
+  // Lab.44 · meta de RTF 0,65 en la voz y optimización rápida
+  ['--check','src/services/optimizationQuickLab44.js'],
+  ['--check','src/renderer-optimization-quick-lab44.js'],
+  ['scripts/check-optimization-quick-lab44.js'],
 ];
 // Python: el mismo "python" que usa package.json (en Linux puede llamarse python3)
 function runPython(args){
