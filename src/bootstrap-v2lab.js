@@ -64,4 +64,5 @@ if(!gotLock){app.quit();}else{
   require('./services/dataLocationLab42').installDataLocationLab42();
   require('./services/profileExtrasLab43').installProfileExtrasLab43();
   require('./services/optimizationQuickLab44').installOptimizationQuickLab44();
+  require('./services/moneySpeechLab45').installMoneySpeechLab45();
 }

@@ -175,6 +175,17 @@ Ver `INTEGRACION_MERLIN.md`, sección "Modelo y animación". Opciones nuevas en 
 - Panel: botón «Optimización rápida» debajo de «Optimizar EC para esta computadora» y nota de la meta (`renderer-optimization-quick-lab44.js`): pide el modo rápido, hace clic en el botón normal y vuelve a `full` cuando el botón normal se reactiva.
 - Prueba: `scripts/check-optimization-quick-lab44.js` (con el `benchmarkQwenPerformance` real y un motor simulado).
 
+## Lab.45 (cifras con dinero y millones)
+
+- Síntoma: «Deuda de S/ 3.2 millones» se oía mal. La pronunciación básica (`normalizeCurrency` de `pronunciation.js`) la pasaba a «3.2 millones de soles» y el normalizador 0326 decía «tres coma dos». Además, «3.25» y «3.20» se leían como hora («tres horas con veinticinco minutos») y «18 000» como «dieciocho cero».
+- `services/moneySpeechLab45.js` (se instala al final de `bootstrap-v2lab.js`, envolviendo `PronunciationNormalizer.prototype.normalize`, por fuera de Lab.32): `speakMoney` pasa a palabras antes de todo lo demás.
+  - Con moneda delante (S/, S/., PEN, US$, USD, $, €, EUR) más cifra y escala opcional (mil, millón/millones, billón/billones, mil millones): «tres punto dos millones de soles», «un millón de soles», «veintiún millones», «mil quinientos soles», «tres soles con veinte céntimos», «un sol», «cincuenta céntimos».
+  - Cifra con decimales y escala, sin moneda: «tres punto dos millones de personas».
+  - Miles con espacio: «18 000» → «18000».
+  - Un separador seguido de exactamente 3 cifras es de miles; si no, es decimal. Con escala, el decimal se dice «punto»; sin escala y con 2 cifras, son céntimos (o centavos).
+  - La pantalla no cambia. El resultado trae `speechTransforms: 'cifras con dinero'` y `moneySpeechVersion`.
+- Prueba: `scripts/check-money-speech-lab45.js`, que recorre la cadena completa: Lab.45 → `basic` → estructural 0328 → normalizador 0326.
+
 ## Pendiente
 
 - Integrar en modo Merlín el envío por NDI (hoy NDI queda bloqueado con aviso en modo Merlín).

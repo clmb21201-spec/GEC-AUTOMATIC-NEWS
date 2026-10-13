@@ -56,6 +56,9 @@ const STEPS=[
   ['--check','src/services/optimizationQuickLab44.js'],
   ['--check','src/renderer-optimization-quick-lab44.js'],
   ['scripts/check-optimization-quick-lab44.js'],
+  // Lab.45 · cifras con dinero y millones («tres punto dos millones de soles»)
+  ['--check','src/services/moneySpeechLab45.js'],
+  ['scripts/check-money-speech-lab45.js'],
 ];
 // Python: el mismo "python" que usa package.json (en Linux puede llamarse python3)
 function runPython(args){
