@@ -238,7 +238,19 @@
     document.body.classList.toggle('gec-nm-active', !!cfg && cfg.enabled !== false);
   }
   function syncCustom(){ $('#gecNmCustom').style.display = $('#gecNmLvl').value === 'custom' ? '' : 'none'; }
-  function syncColorLock(){ const custom = document.querySelector('#gecNmModal input[name=gecNmMode]:checked')?.value === 'custom'; document.querySelectorAll('#gecNmModal [data-c]').forEach(i => i.disabled = !custom); }
+  // «Tomar del Diseño»: los selectores muestran los colores que salen del Diseño de emisión (misma regla que la salida),
+  // no los últimos personalizados guardados; al pasar a «Personalizados» se parte de esos mismos colores.
+  let designColors = null;
+  const hx = v => /^#[0-9a-f]{6}$/i.test(String(v || '')) ? String(v).toUpperCase() : '';
+  function deriveColors(d = {}){
+    const catBg = hx(d.categoryBgColor) || '#F7C600', catTx = hx(d.categoryTextColor) || '#000000', exBg = hx(d.exclusiveBgColor) || '#F7C600', lower = hx(d.lowerBgColor) || '#000000', title = hx(d.titleColor) || '#FFFFFF';
+    return {bar1: catBg, bar2: exBg === catBg ? title : exBg, bar3: lower, voiceBg: lower, voiceBars: catBg, tickerBg: catBg, tickerText: catTx};
+  }
+  async function loadDesignColors(){ try { const st = await api.getSettings(); designColors = deriveColors((st && st.visual && st.visual.output) || {}); } catch { designColors = deriveColors({}); } }
+  function syncColorLock(){
+    const custom = document.querySelector('#gecNmModal input[name=gecNmMode]:checked')?.value === 'custom';
+    document.querySelectorAll('#gecNmModal [data-c]').forEach(i => { i.disabled = !custom; if (!custom && designColors) i.value = designColors[i.dataset.c] || i.value; });
+  }
   async function openModal(){
     await load(); if (!cfg) return; ensureModal();
     document.querySelectorAll('#gecNmModal [data-k]').forEach(i => i.checked = cfg[i.dataset.k] !== false);
@@ -247,7 +259,8 @@
     $('#gecNmMin').value = String(cu.minSec || 6); document.querySelectorAll('#gecNmModal input[name=gecNmTr]').forEach(r => r.checked = r.value === (cu.transition === 'fade' ? 'fade' : 'wipe')); syncCustom();
     const mode = cfg.colors?.mode === 'custom' ? 'custom' : 'auto';
     document.querySelectorAll('#gecNmModal input[name=gecNmMode]').forEach(r => r.checked = r.value === mode);
-    document.querySelectorAll('#gecNmModal [data-c]').forEach(i => i.value = cfg.colors?.[i.dataset.c] || '#000000');
+    await loadDesignColors();
+    document.querySelectorAll('#gecNmModal [data-c]').forEach(i => i.value = (mode === 'auto' ? designColors?.[i.dataset.c] : cfg.colors?.[i.dataset.c]) || cfg.colors?.[i.dataset.c] || '#000000');
     document.querySelectorAll('#gecNmModal [data-t]').forEach(i => i.checked = cfg.ticker?.[i.dataset.t] !== false);
     $('#gecNmLabel').value = cfg.ticker?.label || 'ÚLTIMO'; $('#gecNmEvery').value = String(cfg.ticker?.every || 3);
     $('#gecNmMsgs').value = (cfg.ticker?.messages || []).join('\n');

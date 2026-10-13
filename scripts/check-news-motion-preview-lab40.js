@@ -33,4 +33,6 @@ ok(/function draftFromModal\(\)/.test(r)&&/const next = draftFromModal\(\);/.tes
 ok(/enabled: pSound && r\.config\.sfx\?\.enabled !== false/.test(r),'sonido de la vista previa apagado salvo que se encienda');
 ok(/function closeModal\(\)[^\n]*removeAttribute\('src'\)/.test(r)&&!/bg\.classList\.remove\('show'\)/.test(r),'al cerrar se descarga la vista previa');
 ok(/data-f="9:16"/.test(r)&&/data-i="2">Exclusiva/.test(r),'formatos y noticias de ejemplo');
+ok(/function deriveColors\(d = \{\}\)/.test(r)&&/bar2: exBg === catBg \? title : exBg/.test(r)&&/if \(!custom && designColors\) i\.value = designColors/.test(r),'«Tomar del Diseño» muestra los colores que salen del Diseño (misma regla que la salida)');
+ok(/auto=\{bar1:catBg,bar2:same\(exBg,catBg\)\?title:exBg,bar3:lower,voiceBg:lower,voiceBars:catBg,tickerBg:catBg,tickerText:catTx\}/.test(src('output-news-motion-lab37.js')),'la regla de la salida sigue igual a la del panel');
 console.log(`check-news-motion-preview-lab40 OK (${checks} verificaciones) · ejemplos · IPC · página · panel`);
