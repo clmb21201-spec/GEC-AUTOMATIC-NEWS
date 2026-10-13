@@ -157,6 +157,14 @@ Ver `INTEGRACION_MERLIN.md`, sección "Modelo y animación". Opciones nuevas en 
 - IPC `dataLocation:get|open|pick|set` (`set`: `use` una carpeta que ya tiene datos, `copy` copia los actuales con progreso `dataLocation:progress` sin pisar lo que ya está igual, `local` vuelve a junto al EXE). Antes de cambiar: `profileSwitchSafety0329.stopStrict`, se apagan IA local y voz, y se reinicia con `GEC_V2_TTS_LAB_ROOT` apuntando a la nueva. La carpeta anterior no se borra.
 - Panel: tarjeta «Carpeta de datos e IAs» en Ajustes, debajo de la optimización (`renderer-data-location-lab42.js`). Se ancla a `#ecOptimizer0321` (lo crea `renderer-0321.js` tarde) y espera con un MutationObserver: antes caía en el primer `.card`, dentro de las columnas viejas que Lab.29 oculta, y no se veía. Prueba: `scripts/check-data-location-lab42.js`.
 
+## Lab.43 (el perfil exportado lleva movimiento, sonidos, intervenciones y horario)
+
+- Antes: exportar perfil (`.gecprofile` / `.gecpack`, `services/profilePackage0329.js`) solo llevaba la configuración del perfil (diseño, transiciones, animación de imagen, música, voz, fuentes…); lo que vive en archivos aparte de la carpeta de datos se perdía al importar en otra computadora.
+- `services/profileExtrasLab43.js` (se instala al final de `bootstrap-v2lab.js`, envolviendo `profilePayload`, `allPayload`, `installResources` e `importFile` de `ProfilePackage0329`): agrega `payload.extrasLab43 = {version, profiles: {<id>: {newsMotion, classicHost, schedule}}, skipped}` con `news-motion.json` (movimiento y sonidos), `classic-host.json` (intervenciones; logo y fondo propio como recursos `extras/<id>/classic-host/<archivo>` y en la configuración `@classic-host/<archivo>`; más de 128 MB o faltante → se omite, se avisa en `skipped` y el fondo propio pasa a `anim`) y `broadcast-schedule.json`. Un GEC anterior ignora la clave y esos recursos.
+- Al importar: `installResources` recibe el mapa id original → id nuevo y se guarda; los datos se escriben (normalizados con `normalizeConfig` / `normalizeSchedule`) solo después de que `importFile` terminó bien, con el id nuevo; el logo y el fondo van a `classic-host/<id nuevo>/`. El horario llega **desactivado** (`enabled:false`, con sus franjas) para que otra computadora no empiece a emitir ni a transmitir sola; `result.extrasLab43` trae `applied`, `scheduleDisabled` y `notes`. Si algo falla, la importación del perfil sigue.
+- No viajan (son de cada computadora): modo de salida, OBS, control por ntfy y carpeta de audios de voz.
+- Prueba: `scripts/check-profile-extras-lab43.js` (exporta e importa con el `ProfilePackage0329` real).
+
 ## Pendiente
 
 - Integrar en modo Merlín el envío por NDI (hoy NDI queda bloqueado con aviso en modo Merlín).

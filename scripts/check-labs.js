@@ -49,6 +49,9 @@ const STEPS=[
   ['--check','src/services/dataLocationLab42.js'],
   ['--check','src/renderer-data-location-lab42.js'],
   ['scripts/check-data-location-lab42.js'],
+  // Lab.43 · el perfil exportado lleva movimiento, sonidos, intervenciones (logo y fondo) y horario
+  ['--check','src/services/profileExtrasLab43.js'],
+  ['scripts/check-profile-extras-lab43.js'],
 ];
 // Python: el mismo "python" que usa package.json (en Linux puede llamarse python3)
 function runPython(args){
