@@ -131,5 +131,8 @@ ok(fs.existsSync(path.join(src,'output-classic-host-preview.html')),'vista previ
 // al entrar una intervención (despedida al detener durante un contenido) el contenido se apaga y se detiene
 {const out=require('fs').readFileSync(require('path').join(__dirname,'..','src','output-classic-host-lab38.js'),'utf8');
  ok(/v&&!v\.paused/.test(out)&&/clearCannedVideo\(\)/.test(out)&&/v\.volume=Math\.max\(0,v0\*\(1-k\/6\)\)/.test(out),'la intervención apaga y detiene el contenido que estaba sonando');}
+{const fs=require('fs'),path=require('path'),css=fs.readFileSync(path.join(__dirname,'..','src','output-classic-host-lab38.css'),'utf8');
+ ok(/#chLayer \.chs \.layer\.center\{text-align:center\}/.test(css)&&/#chLayer \.chs \.xC \.over\{text-align:center\}/.test(css),'textos largos centrados en las placas de composición centrada');
+ const rd=fs.readFileSync(path.join(__dirname,'..','src','renderer-classic-host-lab38.js'),'utf8');ok(/view\.profileName \|\| view\.profile/.test(rd),'la ventana muestra el nombre del perfil, no su id');}
 console.log(`check-classic-host-lab38 OK (${n} verificaciones)`);
 })().catch(e=>{console.error('check-classic-host-lab38:',e);process.exit(1);});

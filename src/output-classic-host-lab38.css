@@ -355,3 +355,8 @@
 #chLayer .chs.v .mark.img{max-width:70cqw}
 #chLayer .chs.v:not(.tt){--st:6cqw;--sb:9cqw;--edge:6.5cqw;--sxl:6.5cqw;--sxr:6.5cqw;--btn:0cqw}
 #chLayer .chs .xA .th video,#chLayer .chs .xB .th video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit}
+/* Lab.48 · En las placas de composición centrada (presentación A/C, pase A, regreso A/B, despedida A) el bloque estaba
+   centrado pero el texto se alineaba a la izquierda: con un texto largo, la segunda línea quedaba corrida. */
+#chLayer .chs .layer.center{text-align:center}
+#chLayer .chs .layer.center .row{justify-content:center}
+#chLayer .chs .xC .over{text-align:center}
