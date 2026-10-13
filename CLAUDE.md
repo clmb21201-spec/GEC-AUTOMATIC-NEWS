@@ -236,6 +236,13 @@ Ver `INTEGRACION_MERLIN.md`, sección "Modelo y animación". Opciones nuevas en 
 - Panel: `renderer-offs-lab47.js`. Lista de documentos, cada uno con su modo (texto completo / resumen 30 s / 1 min / 90 s) y «Preparar»; editor en 3 pasos con duración estimada y aviso si el texto queda largo; historial («Escuchar», «Abrir carpeta»).
 - Prueba: `scripts/check-offs-lab47.js`, con un motor de voz simulado. Recorre el flujo completo por IPC, el bloqueo, el audio de 48 kHz, el SRT y el guardado.
 
+## Lab.48 (la optimización figura «SIN OPTIMIZAR» después de reiniciar)
+
+- Síntoma: al terminar la optimización (rápida o completa) la insignia decía «OPTIMIZADA ✓», pero al cerrar y abrir el programa volvía a «SIN OPTIMIZAR». El perfil sí estaba guardado (`tts-lab/active-production-profile.json`) y se aplicaba al iniciar la Preparación (`preflightAutomation`).
+- Causa: `status` de `releaseV2GlobalOptimizationLab29.js` comparaba el perfil con la IA de texto aunque estuviera detenida. Recién abierto el programa, la IA está en su modo por defecto (`safe_streaming`), así que la comparación fallaba («LocalRuntime activo en safe_streaming, se esperaba tuned») y la insignia de Lab.28 (`profileMatch.ok === false`) mostraba «SIN OPTIMIZAR».
+- Ahora, con un perfil compatible y la IA de texto detenida, `status` le aplica el perfil (`configure('tuned', …)`, como al terminar la optimización; detenida no hay nada que reiniciar) y después compara. Si está corriendo con otra configuración no se toca y se informa la diferencia. Un perfil incompatible no se aplica.
+- Prueba: `scripts/check-optimization-badge-lab48.js`.
+
 ## Pendiente
 
 - Integrar en modo Merlín el envío por NDI (hoy NDI queda bloqueado con aviso en modo Merlín).

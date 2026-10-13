@@ -66,6 +66,8 @@ const STEPS=[
   ['--check','src/services/offsLab47.js'],
   ['--check','src/renderer-offs-lab47.js'],
   ['scripts/check-offs-lab47.js'],
+  // Lab.48 · la optimización guardada sigue OPTIMIZADA después de reiniciar (perfil aplicado a la IA de texto detenida)
+  ['scripts/check-optimization-badge-lab48.js'],
 ];
 // Python: el mismo "python" que usa package.json (en Linux puede llamarse python3)
 function runPython(args){
