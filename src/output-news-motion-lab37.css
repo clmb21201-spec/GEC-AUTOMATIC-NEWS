@@ -93,11 +93,12 @@
 #nmLayer .nm-wipe.go i{animation:nmWp .7s cubic-bezier(.7,0,.3,1) forwards}#nmLayer .nm-wipe.go i:nth-child(2){animation-delay:.06s}
 @keyframes nmWp{from{transform:translateX(-3070px) skewX(-16deg)}to{transform:translateX(3260px) skewX(-16deg)}}
 /* golpe de marca entre noticias (sobre la noticia y el contenido, debajo del loop de espera) */
-#nmSting{position:absolute;inset:0;z-index:26;pointer-events:none;overflow:hidden;display:none}
-#nmSting.go{display:block}
-#nmSting .cv{position:absolute;inset:0;background:var(--nm-cov,#000);opacity:0;transition:opacity .45s ease}
-#nmSting.cover .cv{opacity:1;transition:opacity .12s ease}
-#nmSting i{position:absolute;top:-10%;bottom:-10%;left:0;width:1150px;transform:translateX(-3260px) skewX(-16deg)}
+/* siempre montado (invisible): si pasara de display:none a visible, la cortina no respetaría su demora y taparía antes que las barras */
+#nmSting{position:absolute;inset:0;z-index:26;pointer-events:none;overflow:hidden}
+/* la cortina solo cubre mientras las barras tapan la pantalla (el cambio de nota ocurre debajo) y se va enseguida */
+#nmSting .cv{position:absolute;inset:0;background:var(--nm-cov,#000);opacity:0;transition:opacity .22s ease}
+#nmSting.cover .cv{opacity:1;transition:opacity .08s linear .3s}
+#nmSting i{position:absolute;top:-10%;bottom:-10%;left:0;width:1400px;transform:translateX(-3260px) skewX(-16deg)}
 #nmSting i:nth-of-type(1){background:var(--nm-b1)}#nmSting i:nth-of-type(2){background:var(--nm-b2)}#nmSting i:nth-of-type(3){background:var(--nm-b3)}
 #nmSting.exc i:nth-of-type(1){background:var(--exclusive-bg)}
 #nmSting .nx{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:var(--cat-bg);color:var(--cat-color);font-family:var(--category-font-family);font-size:44px;font-weight:900;letter-spacing:.3em;padding:18px 40px 18px 52px;border-radius:10px;opacity:0;white-space:nowrap;box-shadow:0 0 0 12px var(--nm-cov,#000),0 30px 80px rgba(0,0,0,.6)}

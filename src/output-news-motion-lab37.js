@@ -90,7 +90,8 @@
   function showPlane(i,first){
     const pl=plan[i];if(!pl||!cur)return;
     const tmp=document.createElement('div');tmp.innerHTML=planeHTML(cur,pl,i);const el=tmp.firstElementChild;
-    if(first)el.style.setProperty('--dl','.45s');
+    // el primer plano de cada nota aparece de una vez (sin fundido desde negro); sus textos entran con su animación
+    if(first){el.style.setProperty('--dl','.3s');el.style.animation='none';}
     const old=[...planesEl.children];planesEl.appendChild(el);
     if(first)old.forEach(o=>o.remove());else setTimeout(()=>old.forEach(o=>o.remove()),(cfg()||{}).level==='sobrio'?800:620);
     layer.classList.toggle('nm-ps',pl.type==='side');
