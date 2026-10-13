@@ -7,6 +7,7 @@
     const AudioCtx=window.AudioContext||window.webkitAudioContext;if(!AudioCtx)return;
     let ctx;try{ctx=new AudioCtx({sampleRate:48000,latencyHint:'interactive'});}catch{try{ctx=new AudioCtx();}catch{return;}}
     const mix=ctx.createGain(),processor=ctx.createScriptProcessor(1024,2,2),silent=ctx.createGain();silent.gain.value=0;mix.connect(processor);processor.connect(silent);silent.connect(ctx.destination);
+    window.__GEC_NDI_AUDIO__={ctx,mix};// Lab.39: los sonidos de transición se suman a esta mezcla
     const attached=new WeakSet();
     const attach=el=>{
       if(!el||attached.has(el))return;attached.add(el);

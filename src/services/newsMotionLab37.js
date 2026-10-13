@@ -21,7 +21,10 @@ const HEX=/^#[0-9a-f]{6}$/i;
 const COLOR_KEYS=['bar1','bar2','bar3','voiceBg','voiceBars','tickerBg','tickerText'];
 const DEFAULT={enabled:true,level:'normal',facts:true,voice:true,clock:true,progress:true,sting:true,
   colors:{mode:'auto',bar1:'#F7C600',bar2:'#FFFFFF',bar3:'#000000',voiceBg:'#000000',voiceBars:'#F7C600',tickerBg:'#F7C600',tickerText:'#000000'},
-  ticker:{enabled:true,queue:true,rss:true,label:'ÚLTIMO',every:3,messages:[]}};
+  ticker:{enabled:true,queue:true,rss:true,label:'ÚLTIMO',every:3,messages:[]},
+  sfx:{enabled:true,style:'normal',volume:45,events:{sting:true,plane:true,dato:true,ex:true,card:false,host:true}}};
+const SFX_STYLES=new Set(['suave','normal','marcado']);
+const SFX_EVENTS=Object.keys(DEFAULT.sfx.events);
 
 const clone=v=>JSON.parse(JSON.stringify(v));
 const bool=(v,d)=>v==null?d:v!==false;
@@ -31,9 +34,14 @@ function normalizeConfig(raw={}){
   const msgs=(Array.isArray(t.messages)?t.messages:String(t.messages||'').split(/\r?\n/)).map(x=>String(x||'').replace(/\s+/g,' ').trim().slice(0,140)).filter(Boolean).slice(0,12);
   // Personalizado: qué planos se usan, cada cuánto pueden cambiar (3–15 s) y si el cambio es con barrido o fundido
   const cu=r.custom&&typeof r.custom==='object'?r.custom:{},planes={};for(const k of PLANES)planes[k]=bool(cu.planes?.[k],true);if(!PLANES.some(k=>planes[k]))planes.full=true;
+  // Lab.39: sonidos de transición (el volumen se elige en Audio y locución → Música y mezcla)
+  const fx=r.sfx&&typeof r.sfx==='object'?r.sfx:{},fe=fx.events&&typeof fx.events==='object'?fx.events:{},events={};
+  for(const k of SFX_EVENTS)events[k]=bool(fe[k],DEFAULT.sfx.events[k]);
+  const vol=Number(fx.volume);
+  const sfx={enabled:bool(fx.enabled,true),style:SFX_STYLES.has(fx.style)?fx.style:'normal',volume:Number.isFinite(vol)?Math.max(0,Math.min(100,Math.round(vol))):45,events};
   const custom={planes,minSec:Math.max(3,Math.min(15,Math.round(Number(cu.minSec)||6))),transition:cu.transition==='fade'?'fade':'wipe'};
   return{enabled:bool(r.enabled,true),level:LEVELS.has(r.level)?r.level:'normal',custom,facts:bool(r.facts,true),voice:bool(r.voice,true),clock:bool(r.clock,true),progress:bool(r.progress,true),sting:bool(r.sting,true),colors,
-    ticker:{enabled:bool(t.enabled,true),queue:bool(t.queue,true),rss:bool(t.rss,true),label:String(t.label??'ÚLTIMO').replace(/\s+/g,' ').trim().slice(0,24)||'ÚLTIMO',every:Math.max(1,Math.min(10,Math.round(Number(t.every)||3))),messages:msgs}};
+    ticker:{enabled:bool(t.enabled,true),queue:bool(t.queue,true),rss:bool(t.rss,true),label:String(t.label??'ÚLTIMO').replace(/\s+/g,' ').trim().slice(0,24)||'ÚLTIMO',every:Math.max(1,Math.min(10,Math.round(Number(t.every)||3))),messages:msgs},sfx};
 }
 
 // ---------------------------------------------------------------- oraciones y tiempos (mismo criterio que Merlín)

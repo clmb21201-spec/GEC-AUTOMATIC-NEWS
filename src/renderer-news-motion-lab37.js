@@ -1,6 +1,7 @@
 'use strict';
 // Lab.37 · Ajustes de "Noticias con movimiento" (salida clásica), por perfil. Una fila compacta dentro de la tarjeta
-// Transiciones de Diseño de emisión (no agrega una tarjeta nueva) y una ventana con los colores del movimiento y el ticker.
+// Transiciones de Diseño de emisión (no agrega una tarjeta nueva) y una ventana con los colores del movimiento, el ticker y
+// (Lab.39) los sonidos de transición, cuyo volumen va en Audio y locución → Música y mezcla.
 (function installNewsMotionPanelLab37(){
   if (window.__gecNewsMotionPanelLab37) return; window.__gecNewsMotionPanelLab37 = true;
   const api = window.ECAPI;
@@ -26,7 +27,14 @@
   #gecNmModal input[type=checkbox],#gecNmModal input[type=radio]{width:16px;height:16px;flex:0 0 16px;margin:0;padding:0}
   #gecNmModal .gec-nm-color{margin:0}
   #gecNmModal textarea{width:100%;min-height:70px;resize:vertical}
-  #gecNmModal .gec-nm-foot{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}`;
+  #gecNmModal .gec-nm-foot{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+  #gecNmModal .gec-nm-try{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px}
+  #gecNmModal .gec-nm-try button{padding:5px 9px;font-size:12px}
+  #gecNmModal small.gec-nm-hint{color:#8f8f8f;font-size:11px}
+  #gecNmModal #gecNmSfx.off{opacity:.45;pointer-events:none}
+  .gec-nm-obs{display:none;margin:8px 0 0;padding:7px 10px;border:1px solid #4b4020;background:#17150d;border-radius:8px;color:#e8dca8;font-size:12px;line-height:1.4}
+  body.gec-nm-active .gec-nm-obs{display:block}
+  body.gec-nm-active #imageAnimation,body.gec-nm-active #motionSpeed{opacity:.55}`;
   document.head.appendChild(css);
 
   const COLORS = [['bar1','Barras de transición · 1'],['bar2','Barras de transición · 2'],['bar3','Barras de transición · 3'],['voiceBg','Indicador de voz · fondo'],['voiceBars','Indicador de voz · barras'],['tickerBg','Etiqueta del ticker · fondo'],['tickerText','Etiqueta del ticker · texto']];
@@ -36,13 +44,13 @@
     if ($('#gecNmRow')) return;
     const row = document.createElement('div'); row.id = 'gecNmRow';
     row.innerHTML = `<label class="switch-row"><span><b>Noticias con movimiento</b><small>Salida clásica: planos en las pausas de la voz, datos clave, ticker y golpe de marca.</small></span><input id="gecNmOn" type="checkbox"><span class="switch-ui"></span></label>
-      <div class="gec-nm-line"><span class="note" style="margin:0">Movimiento</span><select id="gecNmLevel"><option value="sobrio">Sobrio</option><option value="normal">Normal</option><option value="dinamico">Dinámico</option><option value="custom">Personalizado</option></select><button type="button" class="dark compact" id="gecNmOpen">Colores y ticker…</button></div>`;
+      <div class="gec-nm-line"><span class="note" style="margin:0">Movimiento</span><select id="gecNmLevel"><option value="sobrio">Sobrio</option><option value="normal">Normal</option><option value="dinamico">Dinámico</option><option value="custom">Personalizado</option></select><button type="button" class="dark compact" id="gecNmOpen">Colores, ticker y sonidos…</button></div>`;
     card.appendChild(row);
     row.addEventListener('change', async e => { if (e.target.id === 'gecNmOn' || e.target.id === 'gecNmLevel') { const ok = await save({...cfg, enabled: $('#gecNmOn').checked, level: $('#gecNmLevel').value}); if (ok && e.target.id === 'gecNmLevel' && e.target.value === 'custom') openModal(); } });
     $('#gecNmOpen').addEventListener('click', openModal);
     fill();
   }
-  function fill(){ if (!cfg || !$('#gecNmOn')) return; $('#gecNmOn').checked = cfg.enabled !== false; $('#gecNmLevel').value = cfg.level || 'normal'; }
+  function fill(){ fillMix(); syncDesignNotes(); if (!cfg || !$('#gecNmOn')) return; $('#gecNmOn').checked = cfg.enabled !== false; $('#gecNmLevel').value = cfg.level || 'normal'; }
   async function load(){ try { const r = await api.newsMotionGet(); if (r && r.ok) { cfg = r.config; fill(); } } catch {} }
   async function save(next){
     try { const r = await api.newsMotionSet(next); if (r && r.ok === false) { alert(r.error || 'No se pudo guardar.'); return false; } cfg = r.config; fill(); return true; }
@@ -80,6 +88,21 @@
         </div>
         <p class="note">Los cambios siempre caen en una pausa de la voz. Si apagas la foto completa, la noticia empieza con el primer plano marcado.</p>
       </div>
+      <h3>Sonidos</h3>
+      <label class="gec-nm-check"><input type="checkbox" id="gecNmSfxOn"> Efectos de sonido en las transiciones</label>
+      <div id="gecNmSfx">
+        <label class="gec-nm-check" style="gap:10px">Estilo <select id="gecNmSfxStyle" style="width:auto"><option value="suave">Suave (woosh corto, sin grave)</option><option value="normal">Normal</option><option value="marcado">Marcado (más largo y presente)</option></select></label>
+        <div class="gec-nm-grid">
+          <label class="gec-nm-check"><input type="checkbox" data-e="sting"> Golpe de marca entre noticias <small class="gec-nm-hint">woosh</small></label>
+          <label class="gec-nm-check"><input type="checkbox" data-e="plane"> Cambios de plano <small class="gec-nm-hint">solo con barrido</small></label>
+          <label class="gec-nm-check"><input type="checkbox" data-e="dato"> Dato en grande <small class="gec-nm-hint">golpe grave</small></label>
+          <label class="gec-nm-check"><input type="checkbox" data-e="ex"> Exclusivo <small class="gec-nm-hint">impacto con brillo</small></label>
+          <label class="gec-nm-check"><input type="checkbox" data-e="host"> Intervenciones de la vista clásica <small class="gec-nm-hint">woosh suave</small></label>
+          <label class="gec-nm-check"><input type="checkbox" data-e="card"> Datos clave <small class="gec-nm-hint">clic, suena sobre la voz</small></label>
+        </div>
+        <div class="gec-nm-try"><span class="note" style="margin:0">Probar:</span>${[['sting','Golpe de marca'],['plane','Cambio de plano'],['dato','Dato'],['ex','Exclusivo'],['host','Intervención'],['card','Dato clave']].map(([k, l]) => `<button type="button" class="dark compact" data-try="${k}">${l}</button>`).join('')}</div>
+        <p class="note">El volumen se ajusta en Audio y locución → Música y mezcla. Un mismo efecto no se repite antes de 3 s; el cambio de plano no suena justo después del golpe de marca. Los audios de voz para edición siguen siendo solo voz.</p>
+      </div>
       <h3>Colores del movimiento</h3>
       <label class="gec-nm-check"><input type="radio" name="gecNmMode" value="auto"> Tomar del Diseño (barra 1 = sección, barra 2 = exclusivo o titular, barra 3 = fondo del cintillo)</label>
       <label class="gec-nm-check"><input type="radio" name="gecNmMode" value="custom"> Personalizados</label>
@@ -96,7 +119,8 @@
     </div>`;
     document.body.appendChild(bg);
     bg.addEventListener('click', e => { if (e.target === bg) bg.classList.remove('show'); });
-    bg.addEventListener('change', e => { if (e.target.name === 'gecNmMode') syncColorLock(); if (e.target.id === 'gecNmLvl') syncCustom(); });
+    bg.addEventListener('change', e => { if (e.target.name === 'gecNmMode') syncColorLock(); if (e.target.id === 'gecNmLvl') syncCustom(); if (e.target.id === 'gecNmSfxOn') syncSfx(); });
+    bg.addEventListener('click', e => { const b = e.target.closest('[data-try]'); if (b) tryFx(b.dataset.try, $('#gecNmSfxStyle').value); });
     $('#gecNmCancel').addEventListener('click', () => bg.classList.remove('show'));
     $('#gecNmSave').addEventListener('click', async () => {
       const b = $('#gecNmSave'); b.disabled = true;
@@ -112,9 +136,40 @@
         document.querySelectorAll('#gecNmModal [data-t]').forEach(i => next.ticker[i.dataset.t] = i.checked);
         next.ticker.label = $('#gecNmLabel').value; next.ticker.every = Number($('#gecNmEvery').value) || 3;
         next.ticker.messages = $('#gecNmMsgs').value.split(/\r?\n/);
+        next.sfx = {...(cfg.sfx || {}), enabled: $('#gecNmSfxOn').checked, style: $('#gecNmSfxStyle').value, events: {...(cfg.sfx?.events || {})}};
+        document.querySelectorAll('#gecNmModal [data-e]').forEach(i => next.sfx.events[i.dataset.e] = i.checked);
         if (await save(next)) bg.classList.remove('show');
       } finally { b.disabled = false; }
     });
+  }
+  function syncSfx(){ $('#gecNmSfx').classList.toggle('off', !$('#gecNmSfxOn').checked); }
+  // «Probar»: suena en el panel con el estilo elegido y el volumen de Música y mezcla (no hace falta guardar)
+  let tester = null;
+  function tryFx(k, style){ try { tester = tester || window.GECSfx?.create(); if (!tester) return; tester.setConfig({style, volume: cfg?.sfx?.volume ?? 45}); tester.test(k); } catch {} }
+
+  // Lab.39 · Volumen de los efectos en Audio y locución → Música y mezcla, junto a música, locución y videos
+  function renderMix(){
+    const cv = $('#cannedVolume'), grid = cv && cv.closest('label')?.parentElement; if (!grid || $('#gecNmSfxVol')) return;
+    const l = document.createElement('label'); l.id = 'gecNmSfxVolBox';
+    l.innerHTML = `Volumen efectos de transición<input id="gecNmSfxVol" type="range" min="0" max="100" step="1"><span id="gecNmSfxVolValue" class="range-value">45%</span>`;
+    grid.appendChild(l); grid.style.gridTemplateColumns = 'repeat(2,minmax(0,1fr))';
+    const r = $('#gecNmSfxVol');
+    r.addEventListener('input', () => { $('#gecNmSfxVolValue').textContent = r.value + '%'; });
+    r.addEventListener('change', async () => { if (!cfg) return; if (await save({...cfg, sfx: {...(cfg.sfx || {}), volume: Number(r.value)}})) tryFx('sting', cfg.sfx?.style || 'normal'); });
+    fillMix();
+  }
+  function fillMix(){ const r = $('#gecNmSfxVol'); if (!r || !cfg) return; const v = cfg.sfx?.volume ?? 45; r.value = String(v); $('#gecNmSfxVolValue').textContent = v + '%'; r.title = cfg.sfx?.enabled === false ? 'Los efectos están apagados en Noticias con movimiento → Colores, ticker y sonidos' : ''; }
+
+  // Lab.39 · Opciones del Diseño que cambian de efecto con Noticias con movimiento activado (salida clásica)
+  function obsNote(id, text, where){ if ($('#' + id) || !where) return; const d = document.createElement('div'); d.id = id; d.className = 'gec-nm-obs'; d.textContent = text; where(d); }
+  function syncDesignNotes(){
+    const tr = $('#transitionEnabled')?.closest('label')?.querySelector('small');
+    if (tr) tr.textContent = 'Se aplica entre noticias y contenidos o anuncios.';
+    const anim = $('#imageAnimation')?.closest('label');
+    obsNote('gecNmObsAnim', 'Con Noticias con movimiento activado, la salida clásica usa el movimiento propio de cada plano: «Animación de imagen» y «Velocidad» solo se aplican a Merlín.', d => anim?.parentElement?.insertAdjacentElement('afterend', d));
+    obsNote('gecNmObsPrev', 'Al aire, con Noticias con movimiento activado, este cintillo se reemplaza por los planos del movimiento, con estos mismos colores y tipografías.', d => $('#designPreview')?.insertAdjacentElement('beforebegin', d));
+    obsNote('gecNmObsTr', 'Con Noticias con movimiento activado, entre noticia y noticia va el golpe de marca (o un fundido propio si está apagado); este fundido queda para contenidos y anuncios.', d => $('#transitionDuration')?.closest('label')?.insertAdjacentElement('afterend', d));
+    document.body.classList.toggle('gec-nm-active', !!cfg && cfg.enabled !== false);
   }
   function syncCustom(){ $('#gecNmCustom').style.display = $('#gecNmLvl').value === 'custom' ? '' : 'none'; }
   function syncColorLock(){ const custom = document.querySelector('#gecNmModal input[name=gecNmMode]:checked')?.value === 'custom'; document.querySelectorAll('#gecNmModal [data-c]').forEach(i => i.disabled = !custom); }
@@ -130,10 +185,12 @@
     document.querySelectorAll('#gecNmModal [data-t]').forEach(i => i.checked = cfg.ticker?.[i.dataset.t] !== false);
     $('#gecNmLabel').value = cfg.ticker?.label || 'ÚLTIMO'; $('#gecNmEvery').value = String(cfg.ticker?.every || 3);
     $('#gecNmMsgs').value = (cfg.ticker?.messages || []).join('\n');
+    const fx = cfg.sfx || {}; $('#gecNmSfxOn').checked = fx.enabled !== false; $('#gecNmSfxStyle').value = fx.style || 'normal';
+    document.querySelectorAll('#gecNmModal [data-e]').forEach(i => i.checked = fx.events?.[i.dataset.e] === true); syncSfx();
     syncColorLock(); $('#gecNmBg').classList.add('show');
   }
   // al cambiar de perfil, la configuración es otra
   api.on('profile:changed', () => { load(); });
-  new MutationObserver(() => { if (anchor() && !$('#gecNmRow')) render(); }).observe(document.documentElement, {childList: true, subtree: true});
+  new MutationObserver(() => { if (anchor() && !$('#gecNmRow')) render(); if ($('#cannedVolume') && !$('#gecNmSfxVol')) renderMix(); if (cfg && $('#imageAnimation') && !$('#gecNmObsAnim')) syncDesignNotes(); }).observe(document.documentElement, {childList: true, subtree: true});
   load(); setTimeout(render, 1500);
 })();
