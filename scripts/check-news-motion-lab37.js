@@ -18,6 +18,12 @@ ok(c.colors.mode==='custom'&&c.colors.bar1==='#FF0000'&&c.colors.bar2===d.colors
 ok(c.ticker.every===10&&c.ticker.label==='ÚLTIMO','ticker: cada N acotado y etiqueta vacía');
 ok(c.ticker.messages.length===3&&c.ticker.messages[1]==='dos'&&c.ticker.messages[2].length===140,'mensajes: sin vacíos, recortados a 140');
 
+const cu=nm.normalizeConfig({level:'custom',custom:{planes:{full:false,side:true,zoom:false,dato:true},minSec:99,transition:'fade'}});
+ok(cu.level==='custom'&&cu.custom.planes.full===false&&cu.custom.planes.side===true&&cu.custom.minSec===15&&cu.custom.transition==='fade','Personalizado: planos, mínimo acotado y fundido');
+ok(nm.normalizeConfig({level:'custom',custom:{planes:{full:false,side:false,zoom:false,dato:false}}}).custom.planes.full===true,'Personalizado sin planos: queda la foto completa');
+ok(d.custom.minSec===6&&d.custom.transition==='wipe'&&Object.values(d.custom.planes).every(Boolean),'Personalizado por defecto');
+const outJs=read('src/output-news-motion-lab37.js');
+ok(outJs.includes("if(m.level==='custom')")&&outJs.includes('filter(on)'),'la salida usa los planos elegidos');
 // ---- oraciones ancladas a la voz
 const txt=['Primera oración del titular.','Segunda oración más larga, con una coma en el medio.','Tercera y última.'];
 const segs=[[0.2,2.0],[2.5,4.2],[4.5,7.8],[8.4,10.0]];

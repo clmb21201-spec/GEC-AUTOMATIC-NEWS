@@ -15,7 +15,8 @@ const path=require('path');
 const {fileURLToPath}=require('url');
 
 const FILE='news-motion.json';
-const LEVELS=new Set(['sobrio','normal','dinamico']);
+const LEVELS=new Set(['sobrio','normal','dinamico','custom']);
+const PLANES=['full','side','zoom','dato'];
 const HEX=/^#[0-9a-f]{6}$/i;
 const COLOR_KEYS=['bar1','bar2','bar3','voiceBg','voiceBars','tickerBg','tickerText'];
 const DEFAULT={enabled:true,level:'normal',facts:true,voice:true,clock:true,progress:true,sting:true,
@@ -28,7 +29,10 @@ function normalizeConfig(raw={}){
   const r=raw&&typeof raw==='object'?raw:{},c=r.colors&&typeof r.colors==='object'?r.colors:{},t=r.ticker&&typeof r.ticker==='object'?r.ticker:{};
   const colors={mode:c.mode==='custom'?'custom':'auto'};for(const k of COLOR_KEYS)colors[k]=HEX.test(String(c[k]||''))?String(c[k]).toUpperCase():DEFAULT.colors[k];
   const msgs=(Array.isArray(t.messages)?t.messages:String(t.messages||'').split(/\r?\n/)).map(x=>String(x||'').replace(/\s+/g,' ').trim().slice(0,140)).filter(Boolean).slice(0,12);
-  return{enabled:bool(r.enabled,true),level:LEVELS.has(r.level)?r.level:'normal',facts:bool(r.facts,true),voice:bool(r.voice,true),clock:bool(r.clock,true),progress:bool(r.progress,true),sting:bool(r.sting,true),colors,
+  // Personalizado: qué planos se usan, cada cuánto pueden cambiar (3–15 s) y si el cambio es con barrido o fundido
+  const cu=r.custom&&typeof r.custom==='object'?r.custom:{},planes={};for(const k of PLANES)planes[k]=bool(cu.planes?.[k],true);if(!PLANES.some(k=>planes[k]))planes.full=true;
+  const custom={planes,minSec:Math.max(3,Math.min(15,Math.round(Number(cu.minSec)||6))),transition:cu.transition==='fade'?'fade':'wipe'};
+  return{enabled:bool(r.enabled,true),level:LEVELS.has(r.level)?r.level:'normal',custom,facts:bool(r.facts,true),voice:bool(r.voice,true),clock:bool(r.clock,true),progress:bool(r.progress,true),sting:bool(r.sting,true),colors,
     ticker:{enabled:bool(t.enabled,true),queue:bool(t.queue,true),rss:bool(t.rss,true),label:String(t.label??'ÚLTIMO').replace(/\s+/g,' ').trim().slice(0,24)||'ÚLTIMO',every:Math.max(1,Math.min(10,Math.round(Number(t.every)||3))),messages:msgs}};
 }
 

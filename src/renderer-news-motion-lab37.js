@@ -36,9 +36,9 @@
     if ($('#gecNmRow')) return;
     const row = document.createElement('div'); row.id = 'gecNmRow';
     row.innerHTML = `<label class="switch-row"><span><b>Noticias con movimiento</b><small>Salida clásica: planos en las pausas de la voz, datos clave, ticker y golpe de marca.</small></span><input id="gecNmOn" type="checkbox"><span class="switch-ui"></span></label>
-      <div class="gec-nm-line"><span class="note" style="margin:0">Movimiento</span><select id="gecNmLevel"><option value="sobrio">Sobrio</option><option value="normal">Normal</option><option value="dinamico">Dinámico</option></select><button type="button" class="dark compact" id="gecNmOpen">Colores y ticker…</button></div>`;
+      <div class="gec-nm-line"><span class="note" style="margin:0">Movimiento</span><select id="gecNmLevel"><option value="sobrio">Sobrio</option><option value="normal">Normal</option><option value="dinamico">Dinámico</option><option value="custom">Personalizado</option></select><button type="button" class="dark compact" id="gecNmOpen">Colores y ticker…</button></div>`;
     card.appendChild(row);
-    row.addEventListener('change', e => { if (e.target.id === 'gecNmOn' || e.target.id === 'gecNmLevel') save({...cfg, enabled: $('#gecNmOn').checked, level: $('#gecNmLevel').value}); });
+    row.addEventListener('change', async e => { if (e.target.id === 'gecNmOn' || e.target.id === 'gecNmLevel') { const ok = await save({...cfg, enabled: $('#gecNmOn').checked, level: $('#gecNmLevel').value}); if (ok && e.target.id === 'gecNmLevel' && e.target.value === 'custom') openModal(); } });
     $('#gecNmOpen').addEventListener('click', openModal);
     fill();
   }
@@ -63,6 +63,23 @@
         <label class="gec-nm-check"><input type="checkbox" data-k="clock"> Reloj</label>
         <label class="gec-nm-check"><input type="checkbox" data-k="sting"> Golpe de marca entre noticias</label>
       </div>
+      <h3>Movimiento</h3>
+      <label class="gec-nm-check" style="gap:10px">Nivel <select id="gecNmLvl" style="width:auto"><option value="sobrio">Sobrio (planos de 9 s, fundido)</option><option value="normal">Normal (6 s, barrido)</option><option value="dinamico">Dinámico (4 s, barrido)</option><option value="custom">Personalizado</option></select></label>
+      <div id="gecNmCustom">
+        <p class="note" style="margin:6px 0 4px">Planos que se usan en cada noticia:</p>
+        <div class="gec-nm-grid">
+          <label class="gec-nm-check"><input type="checkbox" data-p="full"> Foto completa</label>
+          <label class="gec-nm-check"><input type="checkbox" data-p="side"> Recuadro (foto al costado)</label>
+          <label class="gec-nm-check"><input type="checkbox" data-p="zoom"> Detalle (acercamiento)</label>
+          <label class="gec-nm-check"><input type="checkbox" data-p="dato"> Dato en grande</label>
+        </div>
+        <div class="gec-nm-grid" style="margin-top:6px">
+          <label class="gec-nm-check" style="gap:10px">Cambiar de plano cada <select id="gecNmMin" style="width:auto">${[3,4,5,6,8,10,12,15].map(n => `<option value="${n}">${n} s o más</option>`).join('')}</select></label>
+          <label class="gec-nm-check"><input type="radio" name="gecNmTr" value="wipe"> Con barrido</label>
+          <label class="gec-nm-check"><input type="radio" name="gecNmTr" value="fade"> Con fundido</label>
+        </div>
+        <p class="note">Los cambios siempre caen en una pausa de la voz. Si apagas la foto completa, la noticia empieza con el primer plano marcado.</p>
+      </div>
       <h3>Colores del movimiento</h3>
       <label class="gec-nm-check"><input type="radio" name="gecNmMode" value="auto"> Tomar del Diseño (barra 1 = sección, barra 2 = exclusivo o titular, barra 3 = fondo del cintillo)</label>
       <label class="gec-nm-check"><input type="radio" name="gecNmMode" value="custom"> Personalizados</label>
@@ -79,13 +96,17 @@
     </div>`;
     document.body.appendChild(bg);
     bg.addEventListener('click', e => { if (e.target === bg) bg.classList.remove('show'); });
-    bg.addEventListener('change', e => { if (e.target.name === 'gecNmMode') syncColorLock(); });
+    bg.addEventListener('change', e => { if (e.target.name === 'gecNmMode') syncColorLock(); if (e.target.id === 'gecNmLvl') syncCustom(); });
     $('#gecNmCancel').addEventListener('click', () => bg.classList.remove('show'));
     $('#gecNmSave').addEventListener('click', async () => {
       const b = $('#gecNmSave'); b.disabled = true;
       try {
         const next = {...cfg, colors: {...(cfg.colors || {})}, ticker: {...(cfg.ticker || {})}};
         document.querySelectorAll('#gecNmModal [data-k]').forEach(i => next[i.dataset.k] = i.checked);
+        next.level = $('#gecNmLvl').value;
+        next.custom = {planes: {}, minSec: Number($('#gecNmMin').value) || 6, transition: document.querySelector('#gecNmModal input[name=gecNmTr]:checked')?.value === 'fade' ? 'fade' : 'wipe'};
+        document.querySelectorAll('#gecNmModal [data-p]').forEach(i => next.custom.planes[i.dataset.p] = i.checked);
+        if (!Object.values(next.custom.planes).some(Boolean)) { alert('Marca al menos un plano.'); return; }
         next.colors.mode = document.querySelector('#gecNmModal input[name=gecNmMode]:checked')?.value === 'custom' ? 'custom' : 'auto';
         document.querySelectorAll('#gecNmModal [data-c]').forEach(i => next.colors[i.dataset.c] = i.value.toUpperCase());
         document.querySelectorAll('#gecNmModal [data-t]').forEach(i => next.ticker[i.dataset.t] = i.checked);
@@ -95,10 +116,14 @@
       } finally { b.disabled = false; }
     });
   }
+  function syncCustom(){ $('#gecNmCustom').style.display = $('#gecNmLvl').value === 'custom' ? '' : 'none'; }
   function syncColorLock(){ const custom = document.querySelector('#gecNmModal input[name=gecNmMode]:checked')?.value === 'custom'; document.querySelectorAll('#gecNmModal [data-c]').forEach(i => i.disabled = !custom); }
   async function openModal(){
     await load(); if (!cfg) return; ensureModal();
     document.querySelectorAll('#gecNmModal [data-k]').forEach(i => i.checked = cfg[i.dataset.k] !== false);
+    $('#gecNmLvl').value = cfg.level || 'normal'; const cu = cfg.custom || {};
+    document.querySelectorAll('#gecNmModal [data-p]').forEach(i => i.checked = cu.planes?.[i.dataset.p] !== false);
+    $('#gecNmMin').value = String(cu.minSec || 6); document.querySelectorAll('#gecNmModal input[name=gecNmTr]').forEach(r => r.checked = r.value === (cu.transition === 'fade' ? 'fade' : 'wipe')); syncCustom();
     const mode = cfg.colors?.mode === 'custom' ? 'custom' : 'auto';
     document.querySelectorAll('#gecNmModal input[name=gecNmMode]').forEach(r => r.checked = r.value === mode);
     document.querySelectorAll('#gecNmModal [data-c]').forEach(i => i.value = cfg.colors?.[i.dataset.c] || '#000000');

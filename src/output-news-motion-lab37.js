@@ -35,6 +35,8 @@
   let cur=null,plan=[],curPlane=-1,raf=0,lastClock='',pendingP=null,paused=false,scale=1;
   const cfg=()=>{const m=(typeof design!=='undefined'&&design)?design.newsMotion:null;return m&&typeof m==='object'?m:null;};
   const enabled=()=>{const m=cfg();return !!(m&&m.enabled!==false);};
+  // nivel: mínimo por plano, barrido o fundido y planos permitidos (Personalizado los elige el operador)
+  const lvl=()=>{const m=cfg()||{};if(m.level==='custom'){const c=m.custom||{};return{min:Math.max(3,Math.min(15,Number(c.minSec)||6)),wipe:c.transition!=='fade',planes:c.planes||{}};}return{min:MIN[m.level]||6,wipe:m.level!=='sobrio',planes:{}};};
   const motionFor=p=>enabled()&&p&&(p.kind||'news')==='news'&&p.motion&&Array.isArray(p.motion.sentences);
   const exclusiveOn=p=>!!p?.isExclusive&&design.exclusiveEnabled!==false&&design.exclusiveBadgeVisible!==false;
   const exText=()=>String(design.exclusiveText||'EXCLUSIVO').slice(0,32);
@@ -48,7 +50,7 @@
     set('--nm-b1',pick('bar1'));set('--nm-b2',pick('bar2'));set('--nm-b3',pick('bar3'));set('--nm-vb',pick('voiceBg'));set('--nm-vbt',pick('voiceBars'));
     set('--nm-tk',pick('tickerBg'));set('--nm-tkt',pick('tickerText'));set('--nm-cov',lower);
     const op=Math.max(.55,Math.min(1,Number(design.lowerOpacity)||.88));set('--nm-lw',rgba(lower,op));set('--nm-lw2',rgba(lower,Math.min(1,op+.06)));
-    layer.className=[m.level==='sobrio'?'sobrio':'',m.voice===false?'novoice':'',m.clock===false?'noclock':'',m.progress===false?'noprog':'',layer.classList.contains('nm-ps')?'nm-ps':''].filter(Boolean).join(' ');
+    layer.className=[!lvl().wipe?'sobrio':'',m.voice===false?'novoice':'',m.clock===false?'noclock':'',m.progress===false?'noprog':'',layer.classList.contains('nm-ps')?'nm-ps':''].filter(Boolean).join(' ');
     updateTickerVisibility();
   }
 
@@ -57,12 +59,13 @@
   function buildPlan(p){
     const m=p.motion,s=m.sentences||[],D=Number(audioEl.duration)>0?audioEl.duration:(Number(p.audioDurationSec)||s[s.length-1]?.end||30);
     scale=!(Array.isArray(m.segments)&&m.segments.length)&&s.length&&s[s.length-1].end>0?D/s[s.length-1].end:1;
-    const level=(cfg()||{}).level,min=MIN[level]||6,hero=heroOf(p),heroSi=hero?hero.si:-1,hasImg=!!imgSrc();
+    const L=lvl(),min=L.min,on=k=>L.planes[k]!==false,hasImg=!!imgSrc(),hero=on('dato')?heroOf(p):null,heroSi=hero?hero.si:-1;
     // cortes posibles: fin de cada oración y, dentro de oraciones largas, las pausas de la voz de 0,35 s o más
     const cuts=[];for(let i=1;i<s.length;i++)cuts.push({t:(Number(s[i].cut)||0)*scale,si:i});
     const segs=Array.isArray(m.segments)?m.segments:[];for(let i=0;i+1<segs.length;i++){const g=segs[i+1][0]-segs[i][1];if(g>=.35){const t=(segs[i][1]+segs[i+1][0])/2;if(!cuts.some(c=>Math.abs(c.t-t)<.6))cuts.push({t,si:-1});}}
     cuts.sort((a,b)=>a.t-b.t);
-    const cyc=hasImg?['side','zoom','full']:['full'],out=[{start:0,type:'full'}];let ci=0,last=0;
+    let cyc=hasImg?['side','zoom','full'].filter(on):(on('full')?['full']:[]);if(!cyc.length)cyc=[hasImg&&on('side')?'side':hasImg&&on('zoom')?'zoom':'full'];
+    const out=[{start:0,type:on('full')||!hasImg?'full':cyc[0]}];let ci=0,last=0;
     for(const c of cuts){const b=c.t,prev=out[out.length-1].type;
       if(c.si>0&&c.si===heroSi&&b-last>=2.5&&b<D-2.5){out.push({start:b,type:'dato'});last=b;continue;}
       // el dato en grande dura lo justo (desde 3 s); el resto respeta el mínimo del nivel
@@ -93,9 +96,9 @@
     // el primer plano de cada nota aparece de una vez (sin fundido desde negro); sus textos entran con su animación
     if(first){el.style.setProperty('--dl','.3s');el.style.animation='none';}
     const old=[...planesEl.children];planesEl.appendChild(el);
-    if(first)old.forEach(o=>o.remove());else setTimeout(()=>old.forEach(o=>o.remove()),(cfg()||{}).level==='sobrio'?800:620);
+    if(first)old.forEach(o=>o.remove());else setTimeout(()=>old.forEach(o=>o.remove()),lvl().wipe?620:800);
     layer.classList.toggle('nm-ps',pl.type==='side');
-    if(!first&&(cfg()||{}).level!=='sobrio'){wipeEl.classList.remove('go');void wipeEl.offsetWidth;wipeEl.classList.add('go');}
+    if(!first&&lvl().wipe){wipeEl.classList.remove('go');void wipeEl.offsetWidth;wipeEl.classList.add('go');}
     const hn=el.querySelector('.nm-hero .n');if(hn)requestAnimationFrame(()=>{let f=parseFloat(getComputedStyle(hn).fontSize)||200,k=0;while(hn.scrollWidth>hn.clientWidth+1&&k++<40){f*=.93;hn.style.fontSize=f+'px';}});
   }
 
