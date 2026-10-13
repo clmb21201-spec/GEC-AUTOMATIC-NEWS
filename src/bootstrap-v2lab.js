@@ -4,7 +4,16 @@ const path=require('path');
 const {app,BrowserWindow}=require('electron');
 const {canonicalLabBase,recoverNestedLabData}=require('./services/v2LabDataPath');
 const rawBase=process.env.GEC_V2_TTS_LAB_ROOT||process.env.PORTABLE_EXECUTABLE_DIR||(!app.isPackaged?path.join(__dirname,'..'):path.dirname(process.execPath));
-const labBase=canonicalLabBase(rawBase);
+let labBase=canonicalLabBase(rawBase);
+// Lab.42: la carpeta de datos e IAs puede seguir a una versión nueva del EXE abierta desde otra carpeta (última usada
+// o carpeta fija elegida en Ajustes). Solo en el EXE; la carpeta real del EXE se recuerda para los reinicios.
+if(app.isPackaged){
+  try{
+    if(!process.env.GEC_V2_EXE_DIR)process.env.GEC_V2_EXE_DIR=process.env.PORTABLE_EXECUTABLE_FILE?path.dirname(process.env.PORTABLE_EXECUTABLE_FILE):(process.env.PORTABLE_EXECUTABLE_DIR||path.dirname(process.execPath));
+    const r=require('./services/dataLocationLab42').resolveStartup({rawBase:process.env.GEC_V2_EXE_DIR,envBase:process.env.GEC_V2_TTS_LAB_ROOT||'',appData:app.getPath('appData'),exeDir:process.env.GEC_V2_EXE_DIR});
+    labBase=r.labBase;global.__gecDataLocation=r;
+  }catch{}
+}
 try{fs.mkdirSync(labBase,{recursive:true});}catch{}
 let pathRecovery=null;
 try{
@@ -52,4 +61,5 @@ if(!gotLock){app.quit();}else{
   require('./services/voiceArchiveLab36').installVoiceArchiveLab36();
   require('./services/newsMotionLab37').installNewsMotionLab37();
   require('./services/classicHostLab38').installClassicHostLab38();
+  require('./services/dataLocationLab42').installDataLocationLab42();
 }
