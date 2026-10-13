@@ -47,6 +47,8 @@ try{
     ok(/stopStrict\(true\)/.test(svc)&&/app\.relaunch\(\)/.test(svc)&&/process\.env\.GEC_V2_TTS_LAB_ROOT = labBase/.test(svc),'antes de cambiar se detiene todo y se reinicia con la carpeta nueva');
     const rd=src('renderer-data-location-lab42.js');
     ok(/Carpeta de datos e IAs/.test(rd)&&/gecDlOpen/.test(rd)&&/gecDlPick/.test(rd)&&/gecDlLocal/.test(rd),'tarjeta con abrir, elegir y volver a junto al EXE');
+    // la tarjeta va debajo de #ecOptimizer0321 (hijo de #tab-settings); el primer .card de Ajustes está en las columnas viejas que Lab.29 oculta
+    ok(/\$\('#ecOptimizer0321'\)/.test(rd)&&/opt\.parentElement === tab/.test(rd)&&/keepPlace/.test(rd)&&!/querySelector\('#tab-settings \.card'\)/.test(rd),'la tarjeta se ancla a la optimización y no queda en el bloque oculto de Ajustes');
     fs.rmSync(tmp,{recursive:true,force:true});
     console.log(`check-data-location-lab42 OK (${checks} verificaciones) · arranque · última carpeta · fija · copia · panel`);
   })().catch(e=>{console.error('check-data-location-lab42: '+e.message);process.exit(1);});

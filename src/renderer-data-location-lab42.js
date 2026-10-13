@@ -29,10 +29,12 @@
   };
   const gb = n => `${(Number(n || 0) / 1073741824).toFixed(1)} GB`;
 
+  // Va justo debajo de «Optimización automática de GEC» (#ecOptimizer0321, hijo directo de #tab-settings). Esa tarjeta la
+  // crea renderer-0321.js, que el programa inyecta después de cargar el panel: hasta que exista no se dibuja nada, porque
+  // las tarjetas viejas de Ajustes (.settings-cols) quedan ocultas cuando Lab.29 arma su propio diseño.
   function anchor(){
-    const tab = $('#tab-settings'); if (!tab) return null;
-    const opt = $('#optimizeEc0321')?.closest('.card');
-    return opt && tab.contains(opt) ? {el: opt, where: 'afterend'} : {el: tab.querySelector('.card') || tab, where: tab.querySelector('.card') ? 'beforebegin' : 'afterbegin'};
+    const tab = $('#tab-settings'), opt = $('#ecOptimizer0321') || $('#optimizeEc0321')?.closest('.card');
+    return tab && opt && opt.parentElement === tab ? opt : null;
   }
   function render(){
     if ($('#gecDataLocCard')) return;
@@ -49,7 +51,7 @@
         <button type="button" class="dark compact" id="gecDlLocal">Usar la carpeta junto al EXE</button>
       </div>
       <div class="gec-dl-msg note" id="gecDlNote">Cambiar de carpeta reinicia GEC. Antes se detienen la emisión y la preparación.</div>`;
-    a.el.insertAdjacentElement(a.where, card);
+    a.insertAdjacentElement('afterend', card);
     card.addEventListener('click', onClick);
     load();
   }
@@ -98,6 +100,8 @@
     $('#gecDlBar b').style.width = pct + '%';
     $('#gecDlNote').textContent = `Copiando… ${pct} % · ${p.done} de ${p.total} archivos · ${gb(p.bytes)} de ${gb(p.totalBytes)}. No cierres GEC.`;
   });
-  new MutationObserver(() => { if (!$('#gecDataLocCard') && anchor()) render(); }).observe(document.documentElement, {childList: true, subtree: true});
+  // si otra parte del panel inserta algo entre la optimización y esta tarjeta (o la mueve), vuelve a su lugar
+  function keepPlace(){ const a = anchor(), c = $('#gecDataLocCard'); if (a && c && a.nextElementSibling !== c) a.insertAdjacentElement('afterend', c); }
+  new MutationObserver(() => { if (!$('#gecDataLocCard')) { if (anchor()) render(); } else keepPlace(); }).observe(document.documentElement, {childList: true, subtree: true});
   setTimeout(render, 1200);
 })();
