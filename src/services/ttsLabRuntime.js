@@ -195,7 +195,7 @@ class TTSLabRuntime{
   }
 
   async benchmarkQwenPerformance(options={},onProgress=()=>{}){
-    const params={...(options.params||{})},caps=await this.qwenCapabilities(),candidates=this.qwenPerfCandidates(params,caps).filter(c=>!options.skipDiagnostic||c.eligible!==false),sampleCount=5,batchSampleCount=2,samplingRuns=Math.max(1,Math.min(sampleCount,Number(options.sampleLimit)||sampleCount));
+    const params={...(options.params||{})},caps=await this.qwenCapabilities(),candidates=this.qwenPerfCandidates(params,caps).filter(c=>!options.skipDiagnostic||c.eligible!==false).filter(c=>!Array.isArray(options.candidateIds)||c.id==='baseline'||options.candidateIds.includes(c.id)),sampleCount=5,batchSampleCount=2,samplingRuns=Math.max(1,Math.min(sampleCount,Number(options.sampleLimit)||sampleCount));
     const warmText='El Comercio verifica el rendimiento de la voz.';
     const testText='El Comercio informó nuevas medidas que serán evaluadas durante las próximas horas. Las autoridades señalaron que los equipos técnicos revisan la información disponible y comunicarán nuevos detalles conforme avance la jornada.';
     const batchText=[
@@ -242,6 +242,9 @@ class TTSLabRuntime{
       const cand=candidates[i];onProgress({type:'tts-lab-benchmark',phase:'candidate',index:i+1,total:candidates.length,label:cand.label});
       try{results.push(await measure(cand,testText,'measure',i+1,candidates.length,samplingRuns));}
       catch(e){results.push({id:cand.id,label:cand.label,eligible:cand.eligible!==false,params:cand.params,rtf:999,error:String(e?.message||e),safe:false,runCount:0,sampleCount:samplingRuns});await this.stopAndWait('qwen3tts').catch(()=>{});}
+      // Lab.44 · meta de RTF: si lo que se elegiría ya llega a la meta, las demás variantes no se miden
+      let stop=null;try{stop=typeof options.stopWhen==='function'?options.stopWhen(results):null;}catch{}
+      if(stop){for(const rest of candidates.slice(i+1))results.push({id:rest.id,label:rest.label,eligible:rest.eligible!==false,params:rest.params,rtf:999,error:String(stop),skipped:true,safe:false,runCount:0,sampleCount:samplingRuns});break;}
     }
 
     const baseline=results.find(x=>x.id==='baseline')||results[0];
@@ -258,6 +261,7 @@ class TTSLabRuntime{
     const rawSampling=eligible[0],samplingGain=rawSampling.id===baseline.id?0:Math.max(0,(Number(baseline.rtf)-Number(rawSampling.rtf))/Number(baseline.rtf)),samplingConfirmed=rawSampling.id===baseline.id||samplingGain>=.05,bestSampling=samplingConfirmed?rawSampling:baseline;
 
     const batchSizes=String(params.voiceMode||'reference')==='finetuned'?[1,2,4,8]:[1],batchResults=[];
+    if(batchSizes.length>1&&Array.isArray(options.batchSizes)&&options.batchSizes.includes(1))batchSizes.splice(0,batchSizes.length,...options.batchSizes); // Lab.44: lotes de la optimización rápida
     let blockLarger=false;
     for(let i=0;i<batchSizes.length;i++){
       const batchSize=batchSizes[i],p={...bestSampling.params,chunkChars:360,batchSize,batchBenchmarkMode:true,performanceProfile:`lab20-batch-${batchSize}`},cand={id:`batch-${batchSize}`,label:`Batch B${batchSize}`,eligible:true,params:p};

@@ -52,6 +52,10 @@ const STEPS=[
   // Lab.43 · el perfil exportado lleva movimiento, sonidos, intervenciones (logo y fondo) y horario
   ['--check','src/services/profileExtrasLab43.js'],
   ['scripts/check-profile-extras-lab43.js'],
+  // Lab.44 · meta de RTF 0,65 en la voz y optimización rápida
+  ['--check','src/services/optimizationQuickLab44.js'],
+  ['--check','src/renderer-optimization-quick-lab44.js'],
+  ['scripts/check-optimization-quick-lab44.js'],
 ];
 // Python: el mismo "python" que usa package.json (en Linux puede llamarse python3)
 function runPython(args){

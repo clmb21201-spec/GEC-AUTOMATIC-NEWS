@@ -63,4 +63,5 @@ if(!gotLock){app.quit();}else{
   require('./services/classicHostLab38').installClassicHostLab38();
   require('./services/dataLocationLab42').installDataLocationLab42();
   require('./services/profileExtrasLab43').installProfileExtrasLab43();
+  require('./services/optimizationQuickLab44').installOptimizationQuickLab44();
 }

@@ -165,6 +165,16 @@ Ver `INTEGRACION_MERLIN.md`, sección "Modelo y animación". Opciones nuevas en 
 - No viajan (son de cada computadora): modo de salida, OBS, control por ntfy y carpeta de audios de voz.
 - Prueba: `scripts/check-profile-extras-lab43.js` (exporta e importa con el `ProfilePackage0329` real).
 
+## Lab.44 (meta de RTF 0,65 y optimización rápida)
+
+- Antes: la medición de la voz Qwen probaba todas las variantes (base, hidden OFF, top-k 20, top-k 10) aunque la primera ya fuera rápida; no había meta de RTF ni modo corto.
+- `services/optimizationQuickLab44.js` (se instala al final de `bootstrap-v2lab.js`, envolviendo `TTSLabRuntime.prototype.benchmarkQwenPerformance` y `LocalRuntime.prototype.__ec0320BenchmarkCandidates`):
+  - Meta (los dos modos): `options.stopWhen` = `targetReached(results)`. Si lo que se elegiría con lo medido (la base, o una variante comparable —frames y duración ±5 %— y ≥ 5 % más rápida) tiene mediana ≤ 0,65, peor corrida ≤ 0,75 y ≥ 2 corridas, las variantes que faltan se agregan como omitidas (`skipped`, `error` con el motivo) y no se miden. El resultado trae `rtfTarget`, `optimizationMode` y `targetSkipped`.
+  - Rápida (`optimization:setMode 'quick'`, vuelve sola a `full` a las 3 h): voz con 2 corridas por variante y solo base + `subk20` (`candidateIds`), lotes B1 y B4 (`batchSizes`, solo fine-tuned), aceleración del predictor de Lab.31 con 2 corridas (`quickOptimization`); nota típica, corta y prueba de escucha se mantienen. IA de texto: `current`, `gpu-full-balanced` y `gpu-full-fast`. IPC `optimization:setMode|getMode`.
+- Puntos acotados: `ttsLabRuntime.js` (`options.candidateIds`, `options.stopWhen` en el bucle de variantes, `options.batchSizes`), `releaseV2GpuIsolationLab30.js` (respeta un `sampleLimit` menor que 3) y `releaseV2QwenSpeedLab31.js` (`graphRuns`).
+- Panel: botón «Optimización rápida» debajo de «Optimizar EC para esta computadora» y nota de la meta (`renderer-optimization-quick-lab44.js`): pide el modo rápido, hace clic en el botón normal y vuelve a `full` cuando el botón normal se reactiva.
+- Prueba: `scripts/check-optimization-quick-lab44.js` (con el `benchmarkQwenPerformance` real y un motor simulado).
+
 ## Pendiente
 
 - Integrar en modo Merlín el envío por NDI (hoy NDI queda bloqueado con aviso en modo Merlín).

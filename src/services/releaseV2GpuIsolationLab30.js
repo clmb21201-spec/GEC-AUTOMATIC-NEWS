@@ -120,7 +120,7 @@ function wrapQwenBench(baseQwenBench){
     let baseline=null;
     try{baseline=await assertGpuFree('la voz');}catch(e){return{ok:false,error:e.message,code:e.code,gpuBaseline:e.gpuBaseline||null};}
     const [options={},...rest]=args;
-    try{const r=await baseQwenBench.call(this,{...options,sampleLimit:QWEN_SAMPLE_LIMIT,skipDiagnostic:true},...rest);if(state.cancelled)return cancelledResult();if(r&&typeof r==='object')r.gpuBaseline=baseline;return r;}
+    try{const r=await baseQwenBench.call(this,{...options,sampleLimit:Math.min(QWEN_SAMPLE_LIMIT,Number(options.sampleLimit)||QWEN_SAMPLE_LIMIT),skipDiagnostic:true},...rest);if(state.cancelled)return cancelledResult();if(r&&typeof r==='object')r.gpuBaseline=baseline;return r;}
     catch(e){if(state.cancelled)return cancelledResult();throw e;}
   };
 }

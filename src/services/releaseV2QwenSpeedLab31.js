@@ -98,14 +98,15 @@ async function speedPhases(rt,r,options,onProgress){
   const ref=(r.results||[]).filter(x=>x&&x.safe&&Number(x.rtf)>0&&Number(x.rtf)<999).sort((a,b)=>Math.abs(Number(a.rtf)-Number(r.bestRealtimeFactor))-Math.abs(Number(b.rtf)-Number(r.bestRealtimeFactor)))[0]||null;
   const baselineRtf=Number(r.bestRealtimeFactor||ref?.rtf||0),baselineDur=Number(ref?.medianDurationSec||0);
   const graphParams={...rec,batchSize:1,chunkMode:'fixed',predictorCudaGraphs:true,benchmarkSeed:20260908,consistencyMode:'stable-v1'};
+  const graphRuns=options.quickOptimization?2:GRAPH_RUNS; // Lab.44: optimización rápida
   const graphs={tested:true,enabled:false,baselineRtf:round(baselineRtf),graphRtf:0,runs:[],reason:'',agreement:null,captureMs:0};
-  emit('lab31-graphs',1,GRAPH_RUNS+1,'Aceleración del predictor · preparando CUDA graphs');
+  emit('lab31-graphs',1,graphRuns+1,'Aceleración del predictor · preparando CUDA graphs');
   try{
     await rt.stopAndWait('qwen3tts');
     const warm=await gen(WARM_TEXT,graphParams);drop(warm);
     const runs=[];let status=warm?.lab31?.predictorGraphs||{};
-    for(let i=0;i<GRAPH_RUNS;i++){
-      emit('lab31-graphs',i+2,GRAPH_RUNS+1,'Aceleración del predictor · midiendo con CUDA graphs',{repeatIndex:i+1,repeatTotal:GRAPH_RUNS});
+    for(let i=0;i<graphRuns;i++){
+      emit('lab31-graphs',i+2,graphRuns+1,'Aceleración del predictor · midiendo con CUDA graphs',{repeatIndex:i+1,repeatTotal:graphRuns});
       const a=await gen(TEST_TEXT,graphParams);runs.push({rtf:round(a.realtimeFactor),durationSec:round(a.durationSec),safe:safe(a)});status=a?.lab31?.predictorGraphs||status;drop(a);
     }
     graphs.runs=runs;graphs.graphRtf=round(median(runs.filter(x=>x.safe).map(x=>x.rtf)));graphs.agreement=status.agreement??null;graphs.captureMs=Number(status.capture_ms||0);
