@@ -1,5 +1,5 @@
 'use strict';
-// Lab.36 · Tarjeta "Guardar audios de voz para edición" en Ajustes, debajo de la tarjeta de Voz: por cada noticia
+// Lab.36 · Tarjeta "Guardar audios de voz para edición" en la pestaña Audio y locución, debajo de la tarjeta de Voz: por cada noticia
 // emitida se guarda el WAV de la voz (sin música), un .txt con el guion y la locución y un .srt sincronizado.
 (function installVoiceArchiveLab36(){
   if (window.__gecVoiceArchiveLab36) return; window.__gecVoiceArchiveLab36 = true;
@@ -11,16 +11,19 @@
   const css = document.createElement('style');
   css.textContent = `
   #gecVoiceArchiveCard .gec-folder{display:flex;gap:6px;margin-top:10px}#gecVoiceArchiveCard .gec-folder input{flex:1;min-width:0}
-  #gecVoiceArchiveCard .gec-check{display:flex;gap:8px;align-items:center;margin-top:10px;color:#ddd;font-size:13px}
+  #gecVoiceArchiveCard .gec-check{display:flex;flex-direction:row;justify-content:flex-start;gap:8px;align-items:center;margin-top:10px;color:#ddd;font-size:13px}
+  #gecVoiceArchiveCard .gec-check input{width:16px;height:16px;flex:0 0 16px;margin:0;padding:0}
   #gecVoiceArchiveCard .gec-days{display:flex;gap:8px;align-items:center;margin-top:10px;color:#ddd;font-size:13px}#gecVoiceArchiveCard .gec-days select{width:auto}`;
   document.head.appendChild(css);
 
-  function anchor(){ const v = $('#voice'); return v ? v.closest('.card') : null; }
+  // La tarjeta de Voz es .card (Ajustes) o .ec27-card (pestaña Audio de Lab.29, donde vive hoy el selector #voice).
+  function anchor(){ const v = $('#voice'); return v ? v.closest('.ec27-card, .card') : null; }
   function render(){
     const a = anchor(); if (!a) return;
     let card = $('#gecVoiceArchiveCard');
     if (!card) {
-      card = document.createElement('div'); card.id = 'gecVoiceArchiveCard'; card.className = 'card'; card.style.marginTop = '16px';
+      card = document.createElement('div'); card.id = 'gecVoiceArchiveCard';
+      if (a.classList.contains('ec27-card')) card.className = 'ec27-card'; else { card.className = 'card'; card.style.marginTop = '16px'; }
       card.innerHTML = `<div class="section-head"><h3>Guardar audios de voz para edición</h3><span id="gecVaPill" class="status-pill neutral">DESACTIVADO</span></div>
         <p class="note">Por cada noticia que sale al aire (salida clásica o Merlín) se guarda el audio de la voz sin música (.wav), el texto con el guion y lo que leyó la voz (.txt) y los subtítulos sincronizados (.srt). Una carpeta por día.</p>
         <label class="gec-check"><input type="checkbox" id="gecVaOn"> Guardar los audios de las noticias emitidas</label>

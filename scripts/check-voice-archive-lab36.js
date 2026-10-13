@@ -96,5 +96,10 @@ ok(/const active=\(\)=>\{try\{return readPresenter\(\)\.mode==='merlin'&&\(curre
 const pre=fs.readFileSync(path.join(root,'src/preload.js'),'utf8');
 ok(/'voiceArchive:state'/.test(pre)&&/voiceArchiveSet:cfg=>invoke\('voiceArchive:set',cfg\)/.test(pre)&&/renderer-voice-archive-lab36\.js/.test(pre),'preload no expone el archivo de voz');
 ok(/installRemoteNtfyLab35\(\);\s*require\('\.\/services\/voiceArchiveLab36'\)\.installVoiceArchiveLab36\(\);/.test(fs.readFileSync(path.join(root,'src/bootstrap-v2lab.js'),'utf8')),'no se instala al final de bootstrap-v2lab.js');
+// la tarjeta se ancla a la de Voz también cuando Lab.29 movió #voice a la pestaña Audio y locución (.ec27-card, sin .card)
+const rva=fs.readFileSync(path.join(root,'src/renderer-voice-archive-lab36.js'),'utf8');
+ok(/closest\('\.ec27-card, \.card'\)/.test(rva)&&/classList\.contains\('ec27-card'\)/.test(rva),'la tarjeta no aparece cuando la Voz está en la pestaña Audio y locución');
+const ux=fs.readFileSync(path.join(root,'src/renderer-audio-ux-lab29.js'),'utf8')+fs.readFileSync(path.join(root,'src/renderer-0327.js'),'utf8');
+ok(/ec27-card/.test(ux),'cambió el contenedor de la tarjeta de Voz de Lab.29: revisar el ancla de la tarjeta');
 fs.rmSync(tmp,{recursive:true,force:true});
 console.log(`check-voice-archive-lab36 OK (${checks} verificaciones) · wav · txt · srt · limpieza · Merlín`);
