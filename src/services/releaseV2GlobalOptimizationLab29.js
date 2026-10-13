@@ -99,7 +99,14 @@ async function status(base=dataRoot()){
   let runtime=null,match={ok:true,pending:!!profile?.localAi?.required,reason:profile?.localAi?.required?'LocalRuntime todavía no inicializado':'IA local no requerida'};
   const local=global.__ec0320LocalRuntime;
   if(profile?.localAi?.required&&local?.status){
-    try{runtime=await local.status();if(runtime?.running||runtime?.profile){match=fidelity.expectedVsRuntime(profile,runtime);}}
+    try{
+      runtime=await local.status();
+      // Lab.48: recién abierto el programa la IA de texto está detenida y en su modo por defecto (el perfil se aplica
+      // al iniciar la Preparación); antes eso se tomaba como «perfil no aplicado» y la insignia decía SIN OPTIMIZAR.
+      // Detenida no hay nada que reiniciar: se le aplica el perfil ahora, igual que al terminar la optimización.
+      if(resolved.compatible&&runtime&&!runtime.running&&local.configure&&!fidelity.expectedVsRuntime(profile,runtime).ok){local.configure('tuned',profile.localAi.config);runtime=await local.status();}
+      if(runtime?.running||runtime?.profile){match=fidelity.expectedVsRuntime(profile,runtime);}
+    }
     catch(e){match={ok:true,pending:true,reason:`LocalRuntime pendiente: ${String(e?.message||e)}`};}
   }
   return{ok:true,profileId,profile:profile?{...clone(profile),valid:resolved.compatible,invalidReason:resolved.reason||''}:null,compatible:resolved.compatible,reason:resolved.reason||'',runtime,profileMatch:match,profileScoped:false,machineGlobal:true,source:resolved.source};

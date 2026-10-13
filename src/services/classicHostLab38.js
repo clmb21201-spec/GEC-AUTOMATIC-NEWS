@@ -107,7 +107,7 @@ function installClassicHostLab38({api=globalThis.__gecScheduleApi,electron=null}
   const config=()=>{const c=normalizeConfig(readAll().profiles[pid()]||{});if(!c.program)c.program=str(profileName(api.dataDir()),60);return c;};
   const log=(k,m)=>{try{api.log?.(k,m);}catch{}};
   const save=cfg=>{const all=readAll();all.profiles[pid()]=normalizeConfig(cfg);writeJson(file(),all);try{global.__gecClassicHostRefresh?.();}catch{}return all.profiles[pid()];};
-  const view=()=>{const c=config();return{ok:true,profile:pid(),config:c,logoUrl:url(c.logo),backgroundUrl:url(c.background.file),nextEmission:nextEmission(c)};};
+  const view=()=>{const c=config();return{ok:true,profile:pid(),profileName:str(profileName(api.dataDir()),60),config:c,logoUrl:url(c.logo),backgroundUrl:url(c.background.file),nextEmission:nextEmission(c)};};
   function copyAsset(src,kind){
     const ext=path.extname(src).toLowerCase(),okLogo=['.png','.jpg','.jpeg','.webp','.svg'],okBg=['.png','.jpg','.jpeg','.webp','.mp4','.webm','.mov','.m4v'];
     if(!(kind==='logo'?okLogo:okBg).includes(ext))throw new Error('Formato no admitido.');

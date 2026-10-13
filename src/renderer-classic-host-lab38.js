@@ -118,7 +118,7 @@
     await load(); if (!view) return; ensureModal();
     draft = JSON.parse(JSON.stringify(view.config)); draft._logoUrl = view.logoUrl; draft._bgUrl = view.backgroundUrl; draft._next = view.nextEmission;
     if (!draft.program) draft.program = '';
-    $('#gecChTitle').textContent = `Intervenciones de la vista clásica · perfil ${view.profile}`;
+    $('#gecChTitle').textContent = `Intervenciones de la vista clásica · perfil ${view.profileName || view.profile}`;
     tab = 'id'; paint(); $('#gecChBg').classList.add('show'); setTimeout(preview, 300);
   }
   function paintBar(){ $$('#gecChModal [data-fmt]').forEach(b => b.classList.toggle('on', b.dataset.fmt === fmt)); const s = SEGS.find(x => x[0] === seg); $('#gecChPrevLbl').textContent = `${s[1]} · ${draft.versions[seg]}`; }
