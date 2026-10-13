@@ -71,6 +71,8 @@ const STEPS=[
   // Lab.49 · la optimización del fine-tuned recupera su modelo al cargar (la copia por perfil lo perdía)
   ['--check','src/services/optimizationIdentityLab49.js'],
   ['scripts/check-optimization-identity-lab49.js'],
+  // Lab.50 · millones con apóstrofo (S/ 3'244,426), romanos delante de un sustantivo («III Simulacro») y apellidos con tilde
+  ['scripts/check-speech-lab50.js'],
 ];
 // Python: el mismo "python" que usa package.json (en Linux puede llamarse python3)
 function runPython(args){

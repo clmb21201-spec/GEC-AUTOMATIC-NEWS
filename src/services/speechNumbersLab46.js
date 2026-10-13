@@ -10,7 +10,7 @@
 // speakNumbers corre antes de la pronunciación (dentro de Lab.45, que va primero para que «S/ 3.2 millones» llegue
 // intacto a su regla). endWithPunctuation envuelve KokoroTTS.prototype.generate (todas las voces: noticias,
 // intervenciones, titulares, Merlín): si el texto no termina en . ! ? … agrega un punto.
-const {integerWords}=require('./speechRules0328');
+const {integerWords,romanToInt}=require('./speechRules0328');
 const {ordinalWords}=require('./speechNormalizer0326');
 
 const VERSION='lab46-numbers-1';
@@ -101,8 +101,37 @@ function speakNumbers(input){
     const dec=/^0/.test(b)?b.split('').map(words).join(' '):words(b);
     return hit(`${words(a)} punto ${dec}${pct?' por ciento':''}`);
   });
+  // 6) Lab.50 · romano delante de un sustantivo: «el III Simulacro» → «el tercer Simulacro», «la IV edición» → «la cuarta
+  // edición», «los XV Juegos» → «los decimoquintos Juegos». Solo después de un artículo o determinante, o al empezar la
+  // oración (I, V y X sueltas, solo después de un determinante). Lo de siempre («León XIV», «siglo XXI») no se toca.
+  s=s.replace(new RegExp(`(^|[.!?:;]\\s+|\\n\\s*|["“«(]\\s*|${L}${DET_RX}\\s+)([IVXLC]{1,7})(\\s+)(\\p{L}[\\p{L}-]*)`,'gu'),(m,lead,roman,sp,noun)=>{
+    const n=romanToInt(roman),det=/\p{L}/u.test(lead);
+    if(!n||n>100||(roman.length===1&&(!det||!/^[IVX]$/.test(roman))))return m;
+    const low=noun.toLowerCase();
+    if(low.length<3||NOT_NOUN.has(low)||ROMAN_NEXT_STOP.has(low)||/^[\p{Lu}]{2,}$/u.test(noun))return m;
+    // género y número: del artículo si lo hay («la II Guerra», «los XV Juegos»); si no, del sustantivo
+    const d=(lead.match(/\p{L}+/u)||[''])[0].toLowerCase();
+    const female=/^(?:la|las|una|esta|estas|esa|esas|nuestra|aquella)$/.test(d)?true:/^(?:el|los|un|del|al|este|estos|ese|esos|nuestro|aquel)$/.test(d)?false:isFeminineNoun(low);
+    const plural=/^(?:los|las|sus|estos|estas|esos|esas)$/.test(d)||(!d||d==='su')&&low.length>4&&/s$/.test(low)&&!/(?:is|us)$/.test(low);
+    const w=romanOrdinal(n,{female,plural});
+    const start=!det&&!/[“«("]/.test(lead)&&(lead===''||/[.!?:;\n]/.test(lead));
+    return hit(`${lead}${start?w[0].toUpperCase()+w.slice(1):w}${sp}${noun}`);
+  });
   return{text:s,count};
 }
+// Lab.50 · ordinales para un romano delante de un sustantivo (hasta 20 en una palabra; desde 21, cardinal)
+const ORD=['','primero','segundo','tercero','cuarto','quinto','sexto','séptimo','octavo','noveno','décimo','undécimo','duodécimo','decimotercero','decimocuarto','decimoquinto','decimosexto','decimoséptimo','decimoctavo','decimonoveno','vigésimo'];
+function romanOrdinal(n,{female=false,plural=false}={}){
+  if(n>20){const w=words(n);return female?fem(w):w.replace(/veintiuno$/,'veintiún').replace(/(^|\s)uno$/,'$1un');}
+  let w=ORD[n];
+  if(female)w=w.replace(/o$/,'a');
+  else if(!plural)w=w.replace(/(primer|tercer)o$/,'$1');
+  return plural?w+'s':w;
+}
+const DET=['el','la','los','las','del','al','un','una','su','sus','este','esta','estos','estas','ese','esa','esos','esas','nuestro','nuestra','aquel','aquella'].map(w=>`[${w[0]}${w[0].toUpperCase()}]${w.slice(1)}`).join('|');
+const DET_RX=`(?:${DET})`;
+// palabras que siguen a una letra suelta y no son el sustantivo («la V de victoria», «el X y el Y»)
+const ROMAN_NEXT_STOP=new Set(['de','del','y','e','o','u','en','a','al','con','por','que','se','es','son','fue','como','sin','sobre','entre','mientras']);
 
 // Final de cada locución: sin punto, Qwen (y otras voces) no baja la entonación en la última palabra.
 function endWithPunctuation(text){
