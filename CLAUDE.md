@@ -124,6 +124,7 @@ Ver `INTEGRACION_MERLIN.md`, sección "Modelo y animación". Opciones nuevas en 
 - Comodines: `{saludo}`, `{programa}`, `{dia}` y `{hora}` («son las ocho y diez de la noche»; solo en Presentación y Despedida, se genera en el momento con hasta 12 s de espera; si no llega, otra frase o se sigue sin intervención). Las demás frases se generan con anticipación (los tres saludos) y quedan en caché en `presenter-voice/`.
 - `presenterHost` (main.js) en puntos acotados: `active()` de Merlín sin cambios; `classicOn()` (perfil activado, sin Merlín y con `output.html` en la salida) y `hostActive()`; frases, cadencia de titulares, intervención apagada por perfil y datos extra para la placa (`hostFlavor:'clasica'`, `upcoming`, `next`, `nextEmission`). Merlín conserva sus frases. Al final de `main.js`: `design.classicHost` (datos para la salida), `__gecPresenterHost` (voz para «Escuchar») y preparación de frases al guardar, al cambiar de perfil y cada 10 min.
 - Salida: `output-classic-host-render-lab38.js` (motor de las 15 placas, compartido con la vista previa) + `output-classic-host-lab38.js|css` (preload los inyecta en `output.html`; también `output-web.html` y `outputLanServer.js`, que sirve logo, fondo e imágenes). Envuelve `showStory`/`showCanned`: `p.kind === 'host'` se dibuja en `#chLayer` (z 22) con la voz en `#audio` (`activeKind='host'`) y avisa el fin con `ECAPI.presenterHostPlayback`, nunca con `outputPlayback`. El logo cuadrado u horizontal ajusta su caja a la proporción (1:1 a 3:1). 9:16 con zonas de TikTok si el Diseño las tiene. El CSS se generó del motor de la maqueta: todo bajo `#chLayer` y animaciones con prefijo `ch`.
+- Contenido al aire cuando entra una intervención (por ejemplo, detener la emisión durante un contenido: GEC corta y se despide de inmediato): `showHost` baja el volumen de `#cannedVideo` en ~0,3 s y lo detiene con `clearCannedVideo()`. Antes seguía sonando debajo de la placa de despedida; Merlín ya lo hacía.
 - Panel: fila "Intervenciones de la vista clásica" en la tarjeta Transiciones (activar, resumen, Editar…) y ventana con pestañas Identidad, Intervenciones, Frases, Cierre y Fondo + vista previa animada (`output-classic-host-preview.html`) (`renderer-classic-host-lab38.js`). Prueba: `scripts/check-classic-host-lab38.js`.
 
 ## Lab.39 (sonidos de transición, opciones que cambian con el movimiento y Claude Haiku 5.5)
@@ -209,12 +210,30 @@ Ver `INTEGRACION_MERLIN.md`, sección "Modelo y animación". Opciones nuevas en 
     - decimales con punto: 1–2 cifras → «punto», con «%» → «por ciento». Los decimales con coma siguen leyéndose «coma».
   - `endWithPunctuation` envuelve `KokoroTTS.prototype.generate` (todas las voces, intervenciones, titulares y Merlín): si el texto no termina en . ! ? …, agrega un punto después de las comillas o paréntesis de cierre. Una coma o un punto y coma final pasan a punto.
 - `qwen_speed_lab31.py` `_trim`: al unir fragmentos deja 120 ms al final (antes 40), para no cortar la caída de la última palabra.
+- Frases de las intervenciones en caché (`presenter-voice/`, `fileFor` en `main.js`): la clave lleva `VOICE_CACHE_REV` (`'lab46'`). Así las frases generadas con versiones anteriores de la voz se vuelven a generar una vez. Hay que subir la revisión cuando cambie la cadena de la voz.
 - Lab.32 (`documentCodesSpeechLab32.js`, `DOC`) también reconoce carpeta, carpeta fiscal, caso y denuncia, y expediente, informe y acta en minúscula: «la carpeta 17-2026» → «carpeta diecisiete, dos mil veintiséis». Caso, denuncia y carpeta exigen un año en el código, para no tocar «ese caso 2-1».
 - Dato grande de Noticias con movimiento (`newsMotionLab37.js`):
   - `NUM` acepta «3 mil 200», que se muestra «3 200».
   - `RE_QTY_ANY` toma una cifra con cualquier sustantivo (3 200 turistas, 3.200 computadoras). No toma años sueltos, cifras de un dígito, «años» u «horas», meses ni palabras que no son sustantivos.
   - En cada oración, la cifra gana a la fecha, la persona o el lugar.
+- Red de seguridad (`digitSafetyNet`, en el envoltorio de Lab.46, después de toda la cadena):
+  - Síntoma: en notas reales la locución llegaba a Qwen con las cifras escritas («3358 galones», «32 años», «2025»). Pasa cuando la 0328 cae al texto sin convertir; por ejemplo, si una regla del paquete actualizable o el aprendizaje guardado hace fallar `structuralPreNormalize` o `validateSpeech`.
+  - Ahora, con el normalizador encendido, si quedan cifras sueltas se vuelve a convertir con las reglas base (sin reglas externas). Cada caso queda en `logs/speech-fallback.log` con el motivo que dio la cadena.
+  - Las cifras pegadas a letras («B5», «COVID-19») no cuentan. Con el normalizador apagado no se toca nada.
 - Prueba: `scripts/check-speech-numbers-lab46.js`, con la cadena completa y el dato grande.
+
+## Lab.47 (Generador de offs)
+
+- La pestaña «Generador de notas» pasa a ser **«Generador de offs»**: convierte un TXT o Word en una locución con la voz de Audio y locución, para usarla en otros videos. Las tarjetas viejas (`.generator-cols`, `#generatedSchedulerControls`) quedan ocultas, sin borrarse; `#manualReview` (revisión manual de RSS) no cambia. No hay «Enviar a la emisión».
+- `services/offsLab47.js` (se instala al final de `bootstrap-v2lab.js`; usa `__gecScheduleApi.automation()` → `providers`, `pronunciation`, `kokoro`, `getSettings`):
+  - **Bloqueo:** no se puede usar con la Preparación o la Emisión en marcha (sin pausar) ni con notas en curso (`inFlight`); el panel muestra el aviso (`offs:progress` con `blocked` / `reason`, cada 1,5 s). Mientras se genera un off, `lockEngine` pone en la instancia de la automatización `startProcessing|resumeProcessing|startEmission|resumeEmission` que fallan con `OFFS_BUSY`; al terminar se restauran. El Horario automático reintenta solo, porque `act` no marca la acción como hecha.
+  - **① Texto:** `offs:pickFiles` lee TXT (UTF-8 o Latin-1, sin BOM) o DOCX (mammoth) y conserva los párrafos. `offs:summarize` pide a la IA (principal → respaldos, `callProvider`) un off de 30, 60 o 90 s (~2,5 palabras/s), sin saludo ni despedida, en JSON `{title, script}`. Antes descarga la voz y después la IA local.
+  - **② Cómo lo leerá la voz:** `offs:prepare` pasa cada párrafo por `pronunciation.normalize` (Lab.32/45/46…) y descarga antes la voz. El panel resalta los cambios (diferencia palabra por palabra) y deja editar; se narra exactamente lo que quede. Desde aquí se puede guardar una sigla en «Siglas».
+  - **③ Audio:** `offs:generate` genera cada párrafo con `kokoro.generate` (voz y velocidad del perfil) y los une con 0,8 s de pausa. Voz a ~-20 dBFS RMS, pico -1 dB, remuestreo sinc a WAV de 48 kHz mono, en `offs-temp/` (se limpia a los 1 día). Cancelable entre párrafos (`offs:cancel`).
+  - **SRT:** con el texto del paso ① (como está escrito), repartido párrafo por párrafo sobre los tramos con voz (`voiceArchiveLab36.speechSegments` / `buildCues` / `toSrt`).
+  - **Guardar:** `offs:save` en la carpeta de `offs.json` (por defecto `Documentos/GEC Offs`), con `.wav` y opcionales `.txt` (UTF-8 con BOM) y `.srt`, sin pisar archivos existentes («Nombre (2)»). Historial de los últimos 20 en `offs-history.json`. IPC `offs:status|pickFiles|summarize|prepare|generate|cancel|pickFolder|setOptions|save|open|fileUrl`.
+- Panel: `renderer-offs-lab47.js`. Lista de documentos, cada uno con su modo (texto completo / resumen 30 s / 1 min / 90 s) y «Preparar»; editor en 3 pasos con duración estimada y aviso si el texto queda largo; historial («Escuchar», «Abrir carpeta»).
+- Prueba: `scripts/check-offs-lab47.js`, con un motor de voz simulado. Recorre el flujo completo por IPC, el bloqueo, el audio de 48 kHz, el SRT y el guardado.
 
 ## Pendiente
 

@@ -112,6 +112,25 @@ function endWithPunctuation(text){
   return `${m[1].replace(/[,;:\-–—]+$/,'')}${m[2]}.`;
 }
 
+// Red de seguridad: con el normalizador encendido, si la locución todavía trae cifras (una regla del paquete actualizable,
+// el aprendizaje guardado u otra capa falló y la cadena cayó al texto sin convertir), se vuelve a convertir con las
+// reglas base. Cada caso queda en logs/speech-fallback.log (carpeta de datos) con el motivo que dio la cadena.
+function digitSafetyNet(self,out){
+  // solo cifras sueltas («3358», «2025»); las pegadas a letras («B5», «COVID-19») no cuentan
+  if(!out||typeof out!=='object'||!/(?<![\p{L}\d])\d+(?![\p{L}\d])/u.test(String(out.text||'')))return out;
+  const settings=self?.getSettings?.()||{};if(settings?.tts?.speechNormalizerEnabled===false)return out;
+  const {normalizeSpeech,validateSpeech}=require('./speechNormalizer0326'),{structuralPreNormalize}=require('./speechRules0328');
+  const before=String(out.text),pre=structuralPreNormalize(before,{rules:[]}).text,n=normalizeSpeech(pre,{enabled:true}).text,check=validateSpeech(before,n);
+  const digits=t=>(String(t).match(/\d+/g)||[]).length,fixed=check.ok&&digits(n)<digits(before);
+  try{
+    const fs=require('fs'),path=require('path'),dir=path.join(String(self?.dataDir||process.env.GEC_V2_TTS_LAB_ROOT||'.'),'logs');fs.mkdirSync(dir,{recursive:true});
+    const why=[out.speechFallbackReason,out.speechDiagnostic?.fallbackReason].filter(Boolean).join(' | ')||'sin motivo informado';
+    fs.appendFileSync(path.join(dir,'speech-fallback.log'),`[${new Date().toISOString()}] ${fixed?'CORREGIDO':'SIN CAMBIOS'} · motivo: ${why} · cifras: ${(before.match(/\d[\d.,:/-]*/g)||[]).slice(0,8).join(' ')} · ${before.slice(0,140).replace(/\s+/g,' ')}\n`);
+  }catch{}
+  if(!fixed)return out;
+  return{...out,text:n,speechFallbackReason:[out.speechFallbackReason,'Lab.46: cifras convertidas por la red de seguridad'].filter(Boolean).join(' | ')};
+}
+
 function installSpeechNumbersLab46(){
   const {PronunciationNormalizer}=require('./pronunciation');
   const proto=PronunciationNormalizer.prototype;
@@ -121,7 +140,8 @@ function installSpeechNumbersLab46(){
     proto.normalize=async function(script,options={}){
       let r={text:String(script??''),count:0};
       try{r=speakNumbers(script);}catch{r={text:String(script??''),count:0};}
-      const out=await base.call(this,r.text,options);
+      let out=await base.call(this,r.text,options);
+      try{out=digitSafetyNet(this,out);}catch{}
       if(!r.count||!out||typeof out!=='object')return out;
       return{...out,speechTransforms:[...new Set([...(out.speechTransforms||[]),'horas, ordinales y decimales'])],speechNumbersVersion:VERSION};
     };
@@ -137,4 +157,4 @@ function installSpeechNumbersLab46(){
   return true;
 }
 
-module.exports={VERSION,speakNumbers,endWithPunctuation,feminine,installSpeechNumbersLab46};
+module.exports={VERSION,speakNumbers,endWithPunctuation,feminine,digitSafetyNet,installSpeechNumbersLab46};

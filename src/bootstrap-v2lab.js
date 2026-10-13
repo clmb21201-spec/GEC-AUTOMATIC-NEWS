@@ -67,4 +67,5 @@ if(!gotLock){app.quit();}else{
   // Lab.46 antes que Lab.45: el último instalado corre primero, y el dinero («S/ 3.2 millones») va antes que los decimales
   require('./services/speechNumbersLab46').installSpeechNumbersLab46();
   require('./services/moneySpeechLab45').installMoneySpeechLab45();
+  require('./services/offsLab47').installOffsLab47();
 }
