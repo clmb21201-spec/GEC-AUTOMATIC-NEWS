@@ -128,5 +128,8 @@ const out=read('src/output-classic-host-lab38.js');
 ok(out.includes('presenterHostPlayback')&&!/outputPlayback\(/.test(out),'la salida avisa el fin de la intervención a presenterHost, no como noticia');
 ok(!read('src/output.html').includes('classic-host')&&!read('src/output.js').includes('chLayer'),'no se modifica la salida clásica original');
 ok(fs.existsSync(path.join(src,'output-classic-host-preview.html')),'vista previa del panel');
+// al entrar una intervención (despedida al detener durante un contenido) el contenido se apaga y se detiene
+{const out=require('fs').readFileSync(require('path').join(__dirname,'..','src','output-classic-host-lab38.js'),'utf8');
+ ok(/v&&!v\.paused/.test(out)&&/clearCannedVideo\(\)/.test(out)&&/v\.volume=Math\.max\(0,v0\*\(1-k\/6\)\)/.test(out),'la intervención apaga y detiene el contenido que estaba sonando');}
 console.log(`check-classic-host-lab38 OK (${n} verificaciones)`);
 })().catch(e=>{console.error('check-classic-host-lab38:',e);process.exit(1);});

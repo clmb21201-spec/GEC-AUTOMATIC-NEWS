@@ -29,6 +29,10 @@
     const seg=SEG[p.segment]||'intro',c=cfg(),letter=String(c.versions?.[seg]||'A').toUpperCase(),v=Math.max(0,'ABC'.indexOf(letter));
     cur=p;ended=false;activeKind='host';stageEl.dataset.kind='host';
     try{audioEl.pause();}catch{}
+    // un contenido o anuncio que estaba al aire (por ejemplo, al detener la emisión y despedirse) se apaga en ~0,3 s y se
+    // detiene: antes seguía sonando debajo de la placa
+    try{const v=typeof cannedVideo!=='undefined'?cannedVideo:document.getElementById('cannedVideo');
+      if(v&&!v.paused){const v0=v.volume;let k=0;const t=setInterval(()=>{k++;try{v.volume=Math.max(0,v0*(1-k/6));}catch{}if(k>=6){clearInterval(t);try{if(typeof clearCannedVideo==='function')clearCannedVideo();else v.pause();}catch{try{v.pause();}catch{}}try{v.volume=v0;}catch{}}},50);}}catch{}
     ctl?.destroy();ctl=window.GECClassicHostRender.mount(layer,{seg,v,fmt:design.format==='9:16'?'v':'h',tt:design.format==='9:16'&&!!design.tiktokSafe,data:dataFor(p)});
     layer.classList.remove('paused');layer.style.transition='opacity .45s ease';layer.style.opacity='0';layer.classList.add('on');layer.getBoundingClientRect();layer.style.opacity='1';
     try{window.__gecSfx?.play('host',{});}catch{}// Lab.39: woosh suave al entrar la placa
