@@ -216,6 +216,19 @@ Ver `INTEGRACION_MERLIN.md`, sección "Modelo y animación". Opciones nuevas en 
   - En cada oración, la cifra gana a la fecha, la persona o el lugar.
 - Prueba: `scripts/check-speech-numbers-lab46.js`, con la cadena completa y el dato grande.
 
+## Lab.47 (Generador de offs)
+
+- La pestaña «Generador de notas» pasa a ser **«Generador de offs»**: convierte un TXT o Word en una locución con la voz de Audio y locución, para usarla en otros videos. Las tarjetas viejas (`.generator-cols`, `#generatedSchedulerControls`) quedan ocultas, sin borrarse; `#manualReview` (revisión manual de RSS) no cambia. No hay «Enviar a la emisión».
+- `services/offsLab47.js` (se instala al final de `bootstrap-v2lab.js`; usa `__gecScheduleApi.automation()` → `providers`, `pronunciation`, `kokoro`, `getSettings`):
+  - **Bloqueo:** no se puede usar con la Preparación o la Emisión en marcha (sin pausar) ni con notas en curso (`inFlight`); el panel muestra el aviso (`offs:progress` con `blocked` / `reason`, cada 1,5 s). Mientras se genera un off, `lockEngine` pone en la instancia de la automatización `startProcessing|resumeProcessing|startEmission|resumeEmission` que fallan con `OFFS_BUSY`; al terminar se restauran. El Horario automático reintenta solo, porque `act` no marca la acción como hecha.
+  - **① Texto:** `offs:pickFiles` lee TXT (UTF-8 o Latin-1, sin BOM) o DOCX (mammoth) y conserva los párrafos. `offs:summarize` pide a la IA (principal → respaldos, `callProvider`) un off de 30, 60 o 90 s (~2,5 palabras/s), sin saludo ni despedida, en JSON `{title, script}`. Antes descarga la voz y después la IA local.
+  - **② Cómo lo leerá la voz:** `offs:prepare` pasa cada párrafo por `pronunciation.normalize` (Lab.32/45/46…) y descarga antes la voz. El panel resalta los cambios (diferencia palabra por palabra) y deja editar; se narra exactamente lo que quede. Desde aquí se puede guardar una sigla en «Siglas».
+  - **③ Audio:** `offs:generate` genera cada párrafo con `kokoro.generate` (voz y velocidad del perfil) y los une con 0,8 s de pausa. Voz a ~-20 dBFS RMS, pico -1 dB, remuestreo sinc a WAV de 48 kHz mono, en `offs-temp/` (se limpia a los 1 día). Cancelable entre párrafos (`offs:cancel`).
+  - **SRT:** con el texto del paso ① (como está escrito), repartido párrafo por párrafo sobre los tramos con voz (`voiceArchiveLab36.speechSegments` / `buildCues` / `toSrt`).
+  - **Guardar:** `offs:save` en la carpeta de `offs.json` (por defecto `Documentos/GEC Offs`), con `.wav` y opcionales `.txt` (UTF-8 con BOM) y `.srt`, sin pisar archivos existentes («Nombre (2)»). Historial de los últimos 20 en `offs-history.json`. IPC `offs:status|pickFiles|summarize|prepare|generate|cancel|pickFolder|setOptions|save|open|fileUrl`.
+- Panel: `renderer-offs-lab47.js`. Lista de documentos, cada uno con su modo (texto completo / resumen 30 s / 1 min / 90 s) y «Preparar»; editor en 3 pasos con duración estimada y aviso si el texto queda largo; historial («Escuchar», «Abrir carpeta»).
+- Prueba: `scripts/check-offs-lab47.js`, con un motor de voz simulado. Recorre el flujo completo por IPC, el bloqueo, el audio de 48 kHz, el SRT y el guardado.
+
 ## Pendiente
 
 - Integrar en modo Merlín el envío por NDI (hoy NDI queda bloqueado con aviso en modo Merlín).

@@ -62,6 +62,10 @@ const STEPS=[
   // Lab.46 · horas con a. m. / p. m., fechas, ordinales, decimales, femeninos y punto final de cada locución
   ['--check','src/services/speechNumbersLab46.js'],
   ['scripts/check-speech-numbers-lab46.js'],
+  // Lab.47 · Generador de offs (texto completo o resumen, vista previa de la locución, audio, SRT)
+  ['--check','src/services/offsLab47.js'],
+  ['--check','src/renderer-offs-lab47.js'],
+  ['scripts/check-offs-lab47.js'],
 ];
 // Python: el mismo "python" que usa package.json (en Linux puede llamarse python3)
 function runPython(args){
