@@ -31,6 +31,7 @@
     try{audioEl.pause();}catch{}
     ctl?.destroy();ctl=window.GECClassicHostRender.mount(layer,{seg,v,fmt:design.format==='9:16'?'v':'h',tt:design.format==='9:16'&&!!design.tiktokSafe,data:dataFor(p)});
     layer.classList.remove('paused');layer.style.transition='opacity .45s ease';layer.style.opacity='0';layer.classList.add('on');layer.getBoundingClientRect();layer.style.opacity='1';
+    try{window.__gecSfx?.play('host',{});}catch{}// Lab.39: woosh suave al entrar la placa
     // música: la de la emisión más baja, o en silencio, según el perfil
     try{if(c.music==='none')musicEl.pause();else{await startMusicForNews();const base=Math.max(0,Math.min(100,Number(design.musicVolume??20)))/100;musicEl.volume=Math.max(0,Math.min(1,base*.45));}}catch{}
     if(serial!==contentSerial)return;

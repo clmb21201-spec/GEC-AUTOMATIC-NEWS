@@ -35,6 +35,10 @@ const STEPS=[
   ['--check','src/output-classic-host-lab38.js'],
   ['--check','src/renderer-classic-host-lab38.js'],
   ['scripts/check-classic-host-lab38.js'],
+  // Lab.39 · sonidos de transición, opciones del Diseño que cambian con el movimiento y Claude Haiku 5.5
+  ['--check','src/gec-sfx-lab39.js'],
+  ['--check','src/output-sfx-lab39.js'],
+  ['scripts/check-sfx-lab39.js'],
 ];
 // Python: el mismo "python" que usa package.json (en Linux puede llamarse python3)
 function runPython(args){

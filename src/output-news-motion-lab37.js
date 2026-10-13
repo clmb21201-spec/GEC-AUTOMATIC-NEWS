@@ -90,8 +90,11 @@
     if(pl.type==='dato'){const h=heroOf(p);return`<div class="nm-pl nm-dato" style="${pd}"><div class="nm-blur">${im}</div><div class="nm-dim"></div><div class="nm-hero"><div class="k">${esc(KICK[h.type]||'EL DATO')}</div><div class="n">${esc(h.big)}</div><div class="s">${esc(h.label||'')}</div><div class="bar"></div></div><div class="nm-strip">${metaHTML(p,false)}<span class="nm-t">${title}</span>${prog}</div></div>`;}
     return`<div class="nm-pl nm-full" style="${pd}"><div class="nm-ph nm-kb">${im}</div><div class="nm-shade"></div><div class="nm-l3">${metaHTML(p,true)}<div class="nm-ttl">${title}</div>${sum?`<div class="nm-sum">${sum}</div>`:''}${prog}</div>${stamp}</div>`;
   }
+  // Lab.39: sonidos de transición (output-sfx-lab39.js; sin él, no suena nada)
+  const sfx=(k,o)=>{try{window.__gecSfx?.play(k,o||{});}catch{}};
   function showPlane(i,first){
     const pl=plan[i];if(!pl||!cur)return;
+    if(!first)sfx(pl.type==='dato'?'dato':'plane',{wipe:lvl().wipe});else if(i===0&&exclusiveOn(cur))sfx('ex',{delay:.6});
     const tmp=document.createElement('div');tmp.innerHTML=planeHTML(cur,pl,i);const el=tmp.firstElementChild;
     // el primer plano de cada nota aparece de una vez (sin fundido desde negro); sus textos entran con su animación
     if(first){el.style.setProperty('--dl','.3s');el.style.animation='none';}
@@ -124,7 +127,7 @@
     let pi=plan.length-1;for(let i=0;i<plan.length;i++){if(t<plan[i].end){pi=i;break;}}
     if(pi!==curPlane){const first=curPlane===-1;curPlane=pi;showPlane(pi,first);}
     const dato=plan[pi]?.type==='dato';
-    for(const c of cardsEl.children){const on=!dato&&t>=+c.dataset.at&&t<+c.dataset.until;if(c.classList.contains('on')!==on)c.classList.toggle('on',on);}
+    for(const c of cardsEl.children){const on=!dato&&t>=+c.dataset.at&&t<+c.dataset.until;if(c.classList.contains('on')!==on){c.classList.toggle('on',on);if(on)sfx('card');}}
     const pr=(Math.min(1,Math.max(0,t/D))*100).toFixed(2)+'%';for(const b of planesEl.querySelectorAll('.nm-prog b'))b.style.width=pr;
     const live=!audioEl.paused&&!paused&&voiced(t),last=planesEl.lastElementChild;
     if(last)last.querySelectorAll('.nm-vb i').forEach((i,b)=>{const x=t*8.5+b*1.9,a=live?.22+.78*Math.abs(Math.sin(x)*Math.cos(x*.47+b)*Math.sin(x*.29+b*.6+1)):.15;i.style.transform=`scaleY(${a.toFixed(3)})`;});
@@ -143,6 +146,7 @@
   }
   function unmount(){cur=null;plan=[];curPlane=-1;stageEl.classList.remove('nm-on');planesEl.innerHTML='';cardsEl.innerHTML='';if(raf){cancelAnimationFrame(raf);raf=0;}}
   function playSting(p){
+    sfx('sting',{ex:exclusiveOn(p)});
     sting.classList.toggle('exc',exclusiveOn(p));
     sting.querySelector('.nx').textContent=exclusiveOn(p)?exText():String(p?.category||'ACTUALIDAD').toUpperCase();
     clearTimeout(playSting.t);sting.classList.remove('go');void sting.offsetWidth;sting.classList.add('go','cover');
