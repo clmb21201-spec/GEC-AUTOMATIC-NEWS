@@ -134,6 +134,13 @@ Ver `INTEGRACION_MERLIN.md`, sección "Modelo y animación". Opciones nuevas en 
 - Claude: `claude-haiku-5-5` (antes `claude-haiku-4-5-20251001`). `claudeBody` le apaga el pensamiento (piensa por defecto y cuenta en `max_tokens`) y sube el tope ~30 % (mismo texto, más fichas); no se envían `temperature` ni prefill. Los ajustes guardados con Haiku 4.5 pasan solos a 5.5.
 - Prueba: `scripts/check-sfx-lab39.js`.
 
+## Lab.40 (vista previa de Noticias con movimiento en el panel)
+
+- La ventana «Colores, ticker y sonidos…» (`renderer-news-motion-lab37.js`) tiene a la derecha la salida real en un iframe (`output-news-motion-preview.html`: `output.js` + versionados + Lab.37 + Lab.39, sin música). `output-news-motion-preview-adapter.js` define un `ECAPI` propio alimentado por `postMessage` (`gec-nm-preview`: `design`, `stories`, `play`, `control`), crea la voz como un WAV mudo con la duración de cada nota, usa fotos de ejemplo en SVG, pasa sola a la siguiente noticia al recibir `ended` (así se ve el golpe de marca) y devuelve `gec-nm-preview-state` (plano y tiempo).
+- Datos: IPC `newsMotion:preview` (`previewStories` en `services/newsMotionLab37.js`): tres noticias de ejemplo (deportes, cifras, exclusiva) con tramos de voz simulados (14 caracteres/s, 0,45 s entre oraciones), el plan real (`buildMotion`) con la configuración que se está editando y el ticker de la cola. El diseño es `getSettings().visual.output` con el formato elegido (16:9 / 9:16) y `newsMotion` de la ventana; el sonido va apagado salvo que se encienda en la barra.
+- `draftFromModal()` arma la configuración tanto para Guardar como para la vista previa; cada cambio la actualiza al instante sin guardar. Al cerrar la ventana el iframe se descarga.
+- Prueba: `scripts/check-news-motion-preview-lab40.js`.
+
 ## Pendiente
 
 - Integrar en modo Merlín el envío por NDI (hoy NDI queda bloqueado con aviso en modo Merlín).

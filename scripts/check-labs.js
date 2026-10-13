@@ -39,6 +39,9 @@ const STEPS=[
   ['--check','src/gec-sfx-lab39.js'],
   ['--check','src/output-sfx-lab39.js'],
   ['scripts/check-sfx-lab39.js'],
+  // Lab.40 · vista previa de Noticias con movimiento en la ventana del panel
+  ['--check','src/output-news-motion-preview-adapter.js'],
+  ['scripts/check-news-motion-preview-lab40.js'],
 ];
 // Python: el mismo "python" que usa package.json (en Linux puede llamarse python3)
 function runPython(args){

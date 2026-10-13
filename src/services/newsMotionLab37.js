@@ -176,6 +176,26 @@ function buildMotion(payload={},{cfg=normalizeConfig(),automation=null,segmentsF
   return{v:1,sentences,facts,ticker:tickerItems({automation,payload,cfg}),segments:Array.isArray(segments)?segments.slice(0,2000):null};
 }
 
+// ---------------------------------------------------------------- vista previa del panel (Lab.40)
+// Tres noticias de ejemplo con la voz simulada (14 caracteres/s, 0,45 s entre oraciones) y el plan real de la salida.
+const PREVIEW_STORIES=[
+  {key:'deportes',category:'DEPORTES',isExclusive:false,title:'Perú vence 2-0 a Bolivia y sube al quinto lugar de las eliminatorias',summary:'Los goles de Andrés Salcedo y Marcos Quispe dan tres puntos clave a la selección, que ahora suma 14 en la tabla.',
+   script:'Perú venció 2-0 a Bolivia en el Estadio Nacional y subió al quinto lugar de las eliminatorias. El primer gol llegó a los 20 minutos, con un cabezazo del delantero Andrés Salcedo. En el segundo tiempo, Marcos Quispe amplió la ventaja con un remate desde fuera del área. Con este resultado, la selección suma 14 puntos y queda en zona de repechaje. El próximo martes visitará a Ecuador en Quito.'},
+  {key:'economia',category:'ECONOMÍA',isExclusive:false,title:'El dólar cierra en S/ 3,72 y baja por tercer día consecutivo',summary:'El tipo de cambio llegó a su nivel más bajo en cinco meses, impulsado por la entrada de capitales.',
+   script:'El dólar cerró a la baja por tercer día consecutivo en el mercado cambiario local. Terminó la jornada en S/ 3,72, su nivel más bajo en cinco meses. Así lo informó el Banco Central de Reserva (BCR) al cierre de las operaciones. En lo que va de la semana, la moneda estadounidense acumula una caída de 1,2 %. Los analistas atribuyen la baja a la entrada de capitales y al alza del precio del cobre.'},
+  {key:'exclusiva',category:'POLÍTICA',isExclusive:true,title:'Congreso aprueba en primera votación la reforma del sistema electoral',summary:'La propuesta obtuvo 78 votos a favor y necesita una segunda votación en la próxima legislatura.',
+   script:'El Congreso aprobó en primera votación la reforma del sistema electoral. La propuesta obtuvo 78 votos a favor, 31 en contra y 9 abstenciones. La presidenta de la comisión, Rosa Medina, dijo que el cambio busca fortalecer a los partidos. Para entrar en vigencia, la reforma necesita una segunda votación el 15 de noviembre. Las bancadas de oposición anunciaron que presentarán observaciones.'}];
+function previewStories(cfgRaw={},{automation=null}={}){
+  const cfg=normalizeConfig(cfgRaw);
+  return PREVIEW_STORIES.map(b=>{
+    const sents=sentencesOf(locutionText(b.title,b.script)),segments=[];let t=.35;
+    for(const x of sents){const d=Math.max(1.6,x.length/14);segments.push([+t.toFixed(3),+(t+d).toFixed(3)]);t+=d+.45;}
+    const duration=+(t+.6).toFixed(3);
+    const p={source:'preview',kind:'news',...b,pubDate:new Date().toISOString(),audioDurationSec:duration,speechSegments:segments};
+    return{...p,motion:buildMotion(p,{cfg,automation})};
+  });
+}
+
 // ---------------------------------------------------------------- instalación (main)
 function profileId(dataDir){try{const {getProfileManager}=require('./profileManager0329');return String(getProfileManager(dataDir).activeId?.()||'default');}catch{return'default';}}
 function readJson(f,fb){try{return JSON.parse(fs.readFileSync(f,'utf8'));}catch{return fb;}}
@@ -204,8 +224,10 @@ function installNewsMotionLab37({api=globalThis.__gecScheduleApi,electron=null}=
     try{global.__gecNewsMotionRefresh?.();}catch{}
     return{ok:true,profile:id,config:cfg};
   });
+  // Lab.40: vista previa en la ventana del panel con la configuración que se está editando (sin guardar)
+  handle('newsMotion:preview',(_e,draft)=>{try{return{ok:true,config:normalizeConfig(draft||config()),stories:previewStories(draft||config(),{automation:api.automation?.()})};}catch(e){return{ok:false,error:String(e.message||e)};}});
   global.__gecNewsMotion={config,enrich};
   return global.__gecNewsMotion;
 }
 
-module.exports={installNewsMotionLab37,normalizeConfig,alignSentences,locutionText,sentencesOf,factsInSentence,extractFacts,timeFacts,tickerItems,buildMotion,DEFAULT};
+module.exports={installNewsMotionLab37,normalizeConfig,alignSentences,locutionText,sentencesOf,factsInSentence,extractFacts,timeFacts,tickerItems,buildMotion,previewStories,DEFAULT};

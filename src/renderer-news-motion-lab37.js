@@ -17,7 +17,21 @@
   #gecNmRow .gec-nm-line select{width:auto;margin:0}
   #gecNmBg{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:9999;padding:16px}
   #gecNmBg.show{display:flex}
-  #gecNmModal{background:#1a1a1a;border:1px solid #303030;border-radius:14px;width:min(760px,100%);max-height:92vh;overflow:auto;padding:18px;color:#fff}
+  #gecNmModal{background:#1a1a1a;border:1px solid #303030;border-radius:14px;width:min(1280px,100%);height:min(880px,94vh);display:flex;flex-direction:column;overflow:hidden;padding:18px;color:#fff}
+  #gecNmModal .gec-nm-cols{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:18px;margin-top:8px}
+  #gecNmModal .gec-nm-left{overflow:auto;padding-right:8px;min-height:0}
+  #gecNmModal .gec-nm-right{display:flex;flex-direction:column;gap:8px;min-height:0}
+  #gecNmModal .gec-nm-pbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  #gecNmModal .gec-nm-seg{display:inline-flex;border:1px solid #3a3a3a;border-radius:8px;overflow:hidden}
+  #gecNmModal .gec-nm-seg button{background:#232323;color:#ddd;border:0;border-right:1px solid #3a3a3a;border-radius:0;padding:6px 11px;font-size:12px;font-weight:700;margin:0}
+  #gecNmModal .gec-nm-seg button:last-child{border-right:0}
+  #gecNmModal .gec-nm-seg button.on{background:#F7C600;color:#000}
+  #gecNmModal .gec-nm-stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:#000;border:1px solid #2a2a2a;border-radius:10px;overflow:hidden}
+  #gecNmModal .gec-nm-stage iframe{border:0;display:block;width:100%;aspect-ratio:16/9;max-height:100%}
+  #gecNmModal .gec-nm-stage.v iframe{width:auto;height:100%;aspect-ratio:9/16;max-width:100%}
+  #gecNmModal .gec-nm-now{font-size:12px;color:#a9a9a9}
+  #gecNmModal .gec-nm-now b{color:#fff}
+  @media (max-width:980px){#gecNmModal{height:auto;max-height:94vh;overflow:auto}#gecNmModal .gec-nm-cols{grid-template-columns:1fr}#gecNmModal .gec-nm-right{order:-1}#gecNmModal .gec-nm-stage{min-height:240px}}
   #gecNmModal h3{margin:14px 0 6px;font-size:14px}
   #gecNmModal .gec-nm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px 14px}
   #gecNmModal .gec-nm-color{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;color:#ddd}
@@ -62,7 +76,8 @@
     const bg = document.createElement('div'); bg.id = 'gecNmBg';
     bg.innerHTML = `<div id="gecNmModal" role="dialog" aria-modal="true" aria-label="Noticias con movimiento">
       <div class="section-head"><h3 style="margin:0">Noticias con movimiento · este perfil</h3></div>
-      <p class="note">Las tipografías, los colores de sección, exclusivo, titular y el fondo del cintillo salen de este Diseño de emisión. Aquí solo van los colores propios del movimiento y el ticker.</p>
+      <p class="note">Las tipografías, los colores de sección, exclusivo, titular y el fondo del cintillo salen de este Diseño de emisión. Aquí solo van los colores propios del movimiento, el ticker y los sonidos. La vista previa muestra los cambios al instante; nada se guarda hasta tocar Guardar.</p>
+      <div class="gec-nm-cols"><div class="gec-nm-left">
       <h3>Elementos</h3>
       <div class="gec-nm-grid">
         <label class="gec-nm-check"><input type="checkbox" data-k="facts"> Datos clave (cifras, personas, lugares)</label>
@@ -115,22 +130,50 @@
       </div>
       <div class="form-grid two"><label>Etiqueta<input id="gecNmLabel" maxlength="24"></label><label>Un mensaje cada<select id="gecNmEvery">${[1,2,3,4,5,6,8,10].map(n => `<option value="${n}">${n} titular${n > 1 ? 'es' : ''}</option>`).join('')}</select></label></div>
       <label>Mensajes del operador (uno por línea)<textarea id="gecNmMsgs" placeholder="Síguenos en @tuprograma"></textarea></label>
+      </div>
+      <div class="gec-nm-right">
+        <div class="gec-nm-pbar">
+          <span class="gec-nm-seg" id="gecNmPStory"><button type="button" data-i="0" class="on">Noticia</button><button type="button" data-i="1">Con cifras</button><button type="button" data-i="2">Exclusiva</button></span>
+          <span class="gec-nm-seg" id="gecNmPFmt"><button type="button" data-f="16:9" class="on">16:9</button><button type="button" data-f="9:16">9:16</button></span>
+          <button type="button" class="dark compact" id="gecNmPRestart">⟲ Desde el inicio</button>
+          <button type="button" class="dark compact" id="gecNmPSound">🔇 Sonido apagado</button>
+        </div>
+        <div class="gec-nm-stage" id="gecNmPStage"><iframe id="gecNmPFrame" title="Vista previa de Noticias con movimiento"></iframe></div>
+        <div class="gec-nm-now">Plano: <b id="gecNmPPlane">—</b> · <span id="gecNmPTime">0:00</span> · La vista previa usa la salida real con tu Diseño; la voz va muda y las fotos son de ejemplo. Pasa sola a la siguiente noticia para mostrar el golpe de marca.</div>
+      </div></div>
       <div class="gec-nm-foot"><button type="button" class="dark" id="gecNmCancel">Cancelar</button><button type="button" id="gecNmSave">Guardar</button></div>
     </div>`;
     document.body.appendChild(bg);
-    bg.addEventListener('click', e => { if (e.target === bg) bg.classList.remove('show'); });
-    bg.addEventListener('change', e => { if (e.target.name === 'gecNmMode') syncColorLock(); if (e.target.id === 'gecNmLvl') syncCustom(); if (e.target.id === 'gecNmSfxOn') syncSfx(); });
+    bg.addEventListener('click', e => { if (e.target === bg) closeModal(); });
+    bg.addEventListener('change', e => { if (e.target.name === 'gecNmMode') syncColorLock(); if (e.target.id === 'gecNmLvl') syncCustom(); if (e.target.id === 'gecNmSfxOn') syncSfx(); if (e.target.closest('.gec-nm-left')) schedulePreview(true); });
+    bg.addEventListener('input', e => { if (e.target.closest('.gec-nm-left') && e.target.matches('input[type=color],input:not([type]),textarea')) schedulePreview(false); });
+    $('#gecNmPStory').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; pStory = Number(b.dataset.i) || 0; paintPreviewBar(); refreshPreview(true); });
+    $('#gecNmPFmt').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; pFmt = b.dataset.f; paintPreviewBar(); refreshPreview(true); });
+    $('#gecNmPRestart').addEventListener('click', () => refreshPreview(true));
+    $('#gecNmPSound').addEventListener('click', () => { pSound = !pSound; paintPreviewBar(); refreshPreview(false); });
+    $('#gecNmPFrame').addEventListener('load', () => { if ($('#gecNmPFrame').getAttribute('src')) refreshPreview(true); });
+    window.addEventListener('message', e => { const m = e.data; if (!m || m.type !== 'gec-nm-preview-state' || e.source !== $('#gecNmPFrame')?.contentWindow) return;
+      if (m.index !== pStory) { pStory = m.index; paintPreviewBar(); }
+      $('#gecNmPPlane').textContent = PLANE_NAME[m.plane] || (m.on ? '—' : 'Cintillo clásico (movimiento apagado)');
+      const t = Math.floor(m.time || 0); $('#gecNmPTime').textContent = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; });
     bg.addEventListener('click', e => { const b = e.target.closest('[data-try]'); if (b) tryFx(b.dataset.try, $('#gecNmSfxStyle').value); });
-    $('#gecNmCancel').addEventListener('click', () => bg.classList.remove('show'));
+    $('#gecNmCancel').addEventListener('click', closeModal);
     $('#gecNmSave').addEventListener('click', async () => {
       const b = $('#gecNmSave'); b.disabled = true;
       try {
+        const next = draftFromModal();
+        if (!Object.values(next.custom.planes).some(Boolean)) { alert('Marca al menos un plano.'); return; }
+        if (await save(next)) closeModal();
+      } finally { b.disabled = false; }
+    });
+  }
+  // Lo que está en la ventana, sin guardar (para Guardar y para la vista previa)
+  function draftFromModal(){
         const next = {...cfg, colors: {...(cfg.colors || {})}, ticker: {...(cfg.ticker || {})}};
         document.querySelectorAll('#gecNmModal [data-k]').forEach(i => next[i.dataset.k] = i.checked);
         next.level = $('#gecNmLvl').value;
         next.custom = {planes: {}, minSec: Number($('#gecNmMin').value) || 6, transition: document.querySelector('#gecNmModal input[name=gecNmTr]:checked')?.value === 'fade' ? 'fade' : 'wipe'};
         document.querySelectorAll('#gecNmModal [data-p]').forEach(i => next.custom.planes[i.dataset.p] = i.checked);
-        if (!Object.values(next.custom.planes).some(Boolean)) { alert('Marca al menos un plano.'); return; }
         next.colors.mode = document.querySelector('#gecNmModal input[name=gecNmMode]:checked')?.value === 'custom' ? 'custom' : 'auto';
         document.querySelectorAll('#gecNmModal [data-c]').forEach(i => next.colors[i.dataset.c] = i.value.toUpperCase());
         document.querySelectorAll('#gecNmModal [data-t]').forEach(i => next.ticker[i.dataset.t] = i.checked);
@@ -138,10 +181,33 @@
         next.ticker.messages = $('#gecNmMsgs').value.split(/\r?\n/);
         next.sfx = {...(cfg.sfx || {}), enabled: $('#gecNmSfxOn').checked, style: $('#gecNmSfxStyle').value, events: {...(cfg.sfx?.events || {})}};
         document.querySelectorAll('#gecNmModal [data-e]').forEach(i => next.sfx.events[i.dataset.e] = i.checked);
-        if (await save(next)) bg.classList.remove('show');
-      } finally { b.disabled = false; }
-    });
+        return next;
   }
+  // ---- Lab.40 · vista previa en vivo (output-news-motion-preview.html: la salida real con noticias de ejemplo)
+  const PLANE_NAME = {full: 'Foto completa', side: 'Recuadro', zoom: 'Detalle', dato: 'Dato en grande'};
+  let pStory = 0, pFmt = '16:9', pSound = false, pTimer = 0, pSeq = 0;
+  function paintPreviewBar(){
+    document.querySelectorAll('#gecNmPStory button').forEach(b => b.classList.toggle('on', Number(b.dataset.i) === pStory));
+    document.querySelectorAll('#gecNmPFmt button').forEach(b => b.classList.toggle('on', b.dataset.f === pFmt));
+    $('#gecNmPStage').classList.toggle('v', pFmt === '9:16');
+    $('#gecNmPSound').textContent = pSound ? '🔊 Sonido encendido' : '🔇 Sonido apagado';
+  }
+  function schedulePreview(replay){ clearTimeout(pTimer); pTimer = setTimeout(() => refreshPreview(replay), replay ? 150 : 350); }
+  async function refreshPreview(replay){
+    const f = $('#gecNmPFrame'); if (!f || !$('#gecNmBg').classList.contains('show') || !f.getAttribute('src') || typeof api.newsMotionPreview !== 'function') return;
+    const seq = ++pSeq, draft = draftFromModal();
+    let r = null, d = {};
+    try { r = await api.newsMotionPreview(draft); } catch {}
+    try { const st = await api.getSettings(); d = (st && st.visual && st.visual.output) || {}; } catch {}
+    if (seq !== pSeq || !r || !r.ok) return;
+    const nm = {...r.config, sfx: {...(r.config.sfx || {}), enabled: pSound && r.config.sfx?.enabled !== false}};
+    const msg = {type: 'gec-nm-preview', design: {...d, format: pFmt, newsMotion: nm}, stories: r.stories};
+    if (replay) msg.play = pStory;
+    try { f.contentWindow.postMessage(msg, '*'); } catch {}
+  }
+  function openPreview(){ const f = $('#gecNmPFrame'); paintPreviewBar(); if (f.getAttribute('src')) refreshPreview(true); else f.setAttribute('src', 'output-news-motion-preview.html'); }
+  // al cerrar la ventana la vista previa se descarga (no gasta GPU ni suena en segundo plano)
+  function closeModal(){ clearTimeout(pTimer); pSeq++; $('#gecNmBg').classList.remove('show'); const f = $('#gecNmPFrame'); if (f) f.removeAttribute('src'); try { f.src = 'about:blank'; f.removeAttribute('src'); } catch {} }
   function syncSfx(){ $('#gecNmSfx').classList.toggle('off', !$('#gecNmSfxOn').checked); }
   // «Probar»: suena en el panel con el estilo elegido y el volumen de Música y mezcla (no hace falta guardar)
   let tester = null;
@@ -187,7 +253,7 @@
     $('#gecNmMsgs').value = (cfg.ticker?.messages || []).join('\n');
     const fx = cfg.sfx || {}; $('#gecNmSfxOn').checked = fx.enabled !== false; $('#gecNmSfxStyle').value = fx.style || 'normal';
     document.querySelectorAll('#gecNmModal [data-e]').forEach(i => i.checked = fx.events?.[i.dataset.e] === true); syncSfx();
-    syncColorLock(); $('#gecNmBg').classList.add('show');
+    syncColorLock(); $('#gecNmBg').classList.add('show'); openPreview();
   }
   // al cambiar de perfil, la configuración es otra
   api.on('profile:changed', () => { load(); });
