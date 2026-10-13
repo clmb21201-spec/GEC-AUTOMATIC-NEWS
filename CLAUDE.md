@@ -243,6 +243,13 @@ Ver `INTEGRACION_MERLIN.md`, sección "Modelo y animación". Opciones nuevas en 
 - Ahora, con un perfil compatible y la IA de texto detenida, `status` le aplica el perfil (`configure('tuned', …)`, como al terminar la optimización; detenida no hay nada que reiniciar) y después compara. Si está corriendo con otra configuración no se toca y se informa la diferencia. Un perfil incompatible no se aplica.
 - Prueba: `scripts/check-optimization-badge-lab48.js`.
 
+## Lab.49 (el fine-tuned optimizado vuelve «SIN OPTIMIZAR» al reabrir)
+
+- Síntoma: aun con Lab.48, con Qwen fine-tuned el panel decía «SIN OPTIMIZAR» / «Pendiente de optimización para este modelo» al abrir el programa, aunque el perfil de producción valía.
+- Causa: `optimization0321` se guarda completa en `global/settings.json` y también en la copia por perfil `profiles/<id>/optimization-lab28.json` (`releaseV2Stabilization.js`, Lab.29 `syncActiveProfileOptimization`). La copia se escribe antes de que `releaseV2Lab` le agregue `ttsMode`, `ttsModelId` y `ttsModelFingerprint`, y al cargar reemplaza a la completa. `renderer-v2lab.js` (`optimizationMatchesCurrent`) exige el modelo y la huella del fine-tuned elegido. Encontrado con una simulación del arranque completo (bootstrap real, IPC `settings:get|save`, `optimization-v2:commit|status`) en dos procesos.
+- `services/optimizationIdentityLab49.js` (se instala al final de `bootstrap-v2lab.js`, envolviendo `SettingsStore.prototype.load` por fuera de todo): si a la optimización le falta el modelo y su motor, clave y firma del runtime (que incluye modelo y huella; sin la voz de referencia) coinciden con la voz actual, se completa con el modelo actual. Otro modelo, otra huella o un fine-tuned sin firma no se tocan.
+- Prueba: `scripts/check-optimization-identity-lab49.js`.
+
 ## Pendiente
 
 - Integrar en modo Merlín el envío por NDI (hoy NDI queda bloqueado con aviso en modo Merlín).

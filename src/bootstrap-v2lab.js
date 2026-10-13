@@ -68,4 +68,6 @@ if(!gotLock){app.quit();}else{
   require('./services/speechNumbersLab46').installSpeechNumbersLab46();
   require('./services/moneySpeechLab45').installMoneySpeechLab45();
   require('./services/offsLab47').installOffsLab47();
+  // Lab.49: al cargar, la optimización del fine-tuned recupera su modelo (la copia por perfil lo perdía)
+  require('./services/optimizationIdentityLab49').installOptimizationIdentityLab49();
 }
