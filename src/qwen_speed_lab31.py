@@ -118,8 +118,10 @@ def _frame_db(audio, sr, frame_sec=0.02):
     return 20.0 * np.log10(rms + 1e-12), hop
 
 
-def _trim(audio, sr, keep_sec=0.04):
-    """Recorta el silencio de las puntas (relativo al pico del fragmento)."""
+def _trim(audio, sr, keep_sec=0.04, tail_sec=0.12):
+    """Recorta el silencio de las puntas (relativo al pico del fragmento).
+    Lab.46: al final se dejan 120 ms (antes 40): la caída de la última palabra (una «s» final, la bajada de la
+    entonación) queda por debajo del umbral y se cortaba, y el fragmento sonaba como si no terminara."""
     db, hop = _frame_db(audio, sr)
     if not len(db):
         return audio
@@ -128,7 +130,7 @@ def _trim(audio, sr, keep_sec=0.04):
         return audio
     keep = int(sr * keep_sec)
     start = max(0, voiced[0] * hop - keep)
-    end = min(len(audio), (voiced[-1] + 1) * hop + keep)
+    end = min(len(audio), (voiced[-1] + 1) * hop + int(sr * tail_sec))
     return audio[start:end]
 
 

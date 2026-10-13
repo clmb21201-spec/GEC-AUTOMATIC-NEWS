@@ -186,6 +186,29 @@ Ver `INTEGRACION_MERLIN.md`, sección "Modelo y animación". Opciones nuevas en 
   - La pantalla no cambia. El resultado trae `speechTransforms: 'cifras con dinero'` y `moneySpeechVersion`.
 - Prueba: `scripts/check-money-speech-lab45.js`, que recorre la cadena completa: Lab.45 → `basic` → estructural 0328 → normalizador 0326.
 
+## Lab.46 (horas con a. m. / p. m., fechas, ordinales, decimales, femeninos y entonación final)
+
+- Síntomas:
+  - «8:30 p.m. en Lima» se leía «ocho y treinta de la noche. en Lima»: el punto de «p.m.» cortaba la frase.
+  - «10 a.m.» quedaba como «diez a. m.» y «2:13 PM» como «… minutospe eme».
+  - «3.30 de la tarde» se leía «tres horas con treinta minutosde la tarde» y «13.10.2026» se tomaba como una hora.
+  - «1.º de mayo» salía «uno. º» y «1.200 personas» salía «mil doscientos personas».
+  - Los decimales con punto se leían con «coma».
+  - Cada titular de «Titulares de esta hora» se generaba sin punto final, y Qwen no cerraba la entonación de la última palabra.
+- `services/speechNumbersLab46.js`:
+  - `speakNumbers` va dentro del envoltorio de `PronunciationNormalizer.prototype.normalize`. Se instala antes que Lab.45 en `bootstrap-v2lab.js`, así que el dinero corre primero.
+  - Convierte:
+    - fechas dd.mm.aaaa, dd/mm/aaaa y dd-mm-aaaa;
+    - «12 m.» (mediodía);
+    - horas con a. m. / p. m. («ocho y treinta de la noche»; madrugada / mañana / mediodía / tarde / noche). Conserva el punto solo si la abreviatura cerraba la oración;
+    - hora seguida de «de la tarde» y similares;
+    - ordinales (º ª ° er ra…, con «primer» / «tercer» delante del sustantivo, sin tocar «°C»);
+    - cifra + sustantivo femenino de una lista («mil doscientas personas», «veintiuna familias», «una persona»);
+    - decimales con punto: 1–2 cifras → «punto», con «%» → «por ciento». Los decimales con coma siguen leyéndose «coma».
+  - `endWithPunctuation` envuelve `KokoroTTS.prototype.generate` (todas las voces, intervenciones, titulares y Merlín): si el texto no termina en . ! ? …, agrega un punto después de las comillas o paréntesis de cierre. Una coma o un punto y coma final pasan a punto.
+- `qwen_speed_lab31.py` `_trim`: al unir fragmentos deja 120 ms al final (antes 40), para no cortar la caída de la última palabra.
+- Prueba: `scripts/check-speech-numbers-lab46.js`, con la cadena completa.
+
 ## Pendiente
 
 - Integrar en modo Merlín el envío por NDI (hoy NDI queda bloqueado con aviso en modo Merlín).

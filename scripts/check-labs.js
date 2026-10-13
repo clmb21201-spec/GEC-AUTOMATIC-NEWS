@@ -59,6 +59,9 @@ const STEPS=[
   // Lab.45 · cifras con dinero y millones («tres punto dos millones de soles»)
   ['--check','src/services/moneySpeechLab45.js'],
   ['scripts/check-money-speech-lab45.js'],
+  // Lab.46 · horas con a. m. / p. m., fechas, ordinales, decimales, femeninos y punto final de cada locución
+  ['--check','src/services/speechNumbersLab46.js'],
+  ['scripts/check-speech-numbers-lab46.js'],
 ];
 // Python: el mismo "python" que usa package.json (en Linux puede llamarse python3)
 function runPython(args){
