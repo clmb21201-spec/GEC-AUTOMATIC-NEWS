@@ -22,7 +22,9 @@
   #gecNmModal .gec-nm-color{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;color:#ddd}
   #gecNmModal .gec-nm-color input{width:46px;height:28px;padding:0;margin:0}
   #gecNmModal .gec-nm-color input:disabled{opacity:.5}
-  #gecNmModal .gec-nm-check{display:flex;gap:8px;align-items:center;font-size:13px;color:#ddd;margin:4px 0}
+  #gecNmModal .gec-nm-check{display:flex;gap:8px;align-items:center;justify-content:flex-start;font-size:13px;color:#ddd;margin:4px 0;text-align:left}
+  #gecNmModal input[type=checkbox],#gecNmModal input[type=radio]{width:16px;height:16px;flex:0 0 16px;margin:0;padding:0}
+  #gecNmModal .gec-nm-color{margin:0}
   #gecNmModal textarea{width:100%;min-height:70px;resize:vertical}
   #gecNmModal .gec-nm-foot{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}`;
   document.head.appendChild(css);
