@@ -35,4 +35,8 @@ ok(/function closeModal\(\)[^\n]*removeAttribute\('src'\)/.test(r)&&!/bg\.classL
 ok(/data-f="9:16"/.test(r)&&/data-i="2">Exclusiva/.test(r),'formatos y noticias de ejemplo');
 ok(/function deriveColors\(d = \{\}\)/.test(r)&&/bar2: exBg === catBg \? title : exBg/.test(r)&&/if \(!custom && designColors\) i\.value = designColors/.test(r),'«Tomar del Diseño» muestra los colores que salen del Diseño (misma regla que la salida)');
 ok(/auto=\{bar1:catBg,bar2:same\(exBg,catBg\)\?title:exBg,bar3:lower,voiceBg:lower,voiceBars:catBg,tickerBg:catBg,tickerText:catTx\}/.test(src('output-news-motion-lab37.js')),'la regla de la salida sigue igual a la del panel');
+// otros «Guardar» del panel (Audio, Ajustes, Claude…) mandan una copia vieja del diseño: no deben pisar la nota ni la promo
+const mainJs=src('main.js');
+ok(/if\(!incoming\.__designV2\)\{delete incomingOutput\.noteDesign;delete incomingOutput\.youtubePromoDesign;delete incomingOutput\.youtubePromoCtaText;\}/.test(mainJs)&&/delete next\.__designV2;settingsStore\.save\(next\)/.test(mainJs),'settings:save solo acepta la nota y la promo del editor de Diseño');
+ok(/fresh\.__designV2=true;/.test(src('renderer-emission-design-v2.js'))&&/saveSettings\(Object\.assign\(fresh,\{__designV2:true\}\)\)/.test(src('renderer-stabilization-lab28.js')),'el editor de Diseño y el de la promo marcan sus guardados');
 console.log(`check-news-motion-preview-lab40 OK (${checks} verificaciones) · ejemplos · IPC · página · panel`);

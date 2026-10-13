@@ -140,6 +140,7 @@ Ver `INTEGRACION_MERLIN.md`, sección "Modelo y animación". Opciones nuevas en 
 - Datos: IPC `newsMotion:preview` (`previewStories` en `services/newsMotionLab37.js`): tres noticias de ejemplo (deportes, cifras, exclusiva) con tramos de voz simulados (14 caracteres/s, 0,45 s entre oraciones), el plan real (`buildMotion`) con la configuración que se está editando y el ticker de la cola. El diseño es `getSettings().visual.output` con el formato elegido (16:9 / 9:16) y `newsMotion` de la ventana; el sonido va apagado salvo que se encienda en la barra.
 - `draftFromModal()` arma la configuración tanto para Guardar como para la vista previa; cada cambio la actualiza al instante sin guardar. Al cerrar la ventana el iframe se descarga.
 - Colores del movimiento en modo «Tomar del Diseño»: los selectores muestran los que salen del Diseño (`deriveColors`, misma regla que `applyColors` de la salida) y no los últimos personalizados guardados; al pasar a «Personalizados» se parte de esos.
+- Colores del Diseño que volvían al amarillo: los demás «Guardar» del panel (Audio y locución, Ajustes, probar Claude…) mandan `settings` con la copia de `visual.output.noteDesign` que el panel cargó al abrirse y pisaban lo que había guardado el editor de Diseño. Ahora `settings:save` (main.js) descarta `noteDesign`, `youtubePromoDesign` y `youtubePromoCtaText` salvo que el guardado traiga `__designV2` (lo ponen `renderer-emission-design-v2.js` y el guardado de la promo en `renderer-stabilization-lab28.js`).
 - Prueba: `scripts/check-news-motion-preview-lab40.js`.
 
 ## Pendiente
