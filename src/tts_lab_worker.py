@@ -27,6 +27,11 @@ try:
     import qwen_runaway_lab34 as RUNAWAY
 except Exception:
     RUNAWAY = None
+# Lab.41: murmullos antes de la primera palabra y retumbo grave en las pausas (qwen_onset_lab41.py, junto al worker).
+try:
+    import qwen_onset_lab41 as ONSET
+except Exception:
+    ONSET = None
 
 ENGINE = sys.argv[1] if len(sys.argv) > 1 else ""
 MODEL = None
@@ -1339,6 +1344,23 @@ def generate(payload):
     runaway_events = []
     runaway_on = ENGINE == "qwen3tts" and RUNAWAY is not None and not bool(params.get("batchBenchmarkMode"))
 
+    # Lab.41: cada fragmento de Qwen empieza en su primera palabra (sin murmullos ni silencio previo); queda en "onset".
+    onset_events = []
+    onset_on = ENGINE == "qwen3tts" and ONSET is not None and not bool(params.get("batchBenchmarkMode"))
+
+    def clean_onset(idx, audio_item, sr):
+        if not onset_on or not sr or audio_item is None or not len(audio_item):
+            return audio_item
+        try:
+            cleaned, info = ONSET.clean_head(audio_item, sr)
+            if info.get("applied"):
+                onset_events.append({"chunk": idx + 1, "reason": str(info.get("reason") or ""), "cut_sec": float(info.get("cut_sec") or 0),
+                                     "murmur_sec": float(info.get("murmur_sec") or 0)})
+                return cleaned
+        except Exception as exc:
+            onset_events.append({"chunk": idx + 1, "reason": "error: " + str(exc)[:160], "cut_sec": 0.0, "murmur_sec": 0.0})
+        return audio_item
+
     def fix_runaway(idx, part, audio_item, sr, cap_sec):
         if not runaway_on or not sr or audio_item is None or not len(audio_item):
             return audio_item
@@ -1428,6 +1450,7 @@ def generate(payload):
             for offset, (part, audio_item) in enumerate(zip(group, audios)):
                 idx = group_start + offset
                 audio_item = fix_runaway(idx, part, audio_item, sr, batch_diag.get("lab34_cap_sec"))
+                audio_item = clean_onset(idx, audio_item, sr)
                 chunk_audio_sec = round(len(audio_item) / float(sr), 3) if sr else 0
                 estimated_talker = max(1, int(round(chunk_audio_sec * 12.5))) if chunk_audio_sec else 0
                 chunk_diagnostics.append({
@@ -1493,6 +1516,7 @@ def generate(payload):
                 chunk_beat.join(timeout=1)
             sample_rate = sr
             audio_item = fix_runaway(idx, part, audio_item, sr, piece_diag.get("lab34_cap_sec"))
+            audio_item = clean_onset(idx, audio_item, sr)
             chunk_elapsed_ms = round((time.perf_counter() - chunk_started) * 1000)
             chunk_audio_sec = round(len(audio_item) / float(sr), 3) if sr else 0
             chunk_diagnostics.append({
@@ -1533,6 +1557,12 @@ def generate(payload):
         audio, join_diag = LAB31.join_pieces(chunk_audios, sample_rate, qwen_runtime_params(params)["joinPauseMs"] / 1000.0)
     else:
         audio = np.concatenate(pieces)
+    if onset_on:
+        try:
+            audio, hp_diag = ONSET.highpass(audio, sample_rate)
+            onset_events.append({"chunk": 0, "reason": "filtro bajo 60 Hz", "cut_sec": 0.0, "murmur_sec": 0.0, "removed_rms_db": hp_diag.get("removed_rms_db")})
+        except Exception as exc:
+            onset_events.append({"chunk": 0, "reason": "filtro: " + str(exc)[:160], "cut_sec": 0.0, "murmur_sec": 0.0})
     concat_ms = round((time.perf_counter() - concat_started) * 1000)
     if not np.isfinite(audio).all():
         raise RuntimeError("Qwen3-TTS produjo muestras de audio no válidas con esta configuración")
@@ -1579,6 +1609,7 @@ def generate(payload):
         "chunk_chars": [len(x) for x in text_chunks],
         "join": join_diag,
         "runaway": runaway_events,
+        "onset": onset_events,
         "predictor_cuda_graphs": (LAB31.predictor_graphs_status(MODEL) if (ENGINE == "qwen3tts" and LAB31 is not None and MODEL is not None) else {}),
         "stage_timings": {
             "setup_ms": setup_ms,

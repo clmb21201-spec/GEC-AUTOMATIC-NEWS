@@ -42,6 +42,9 @@ const STEPS=[
   // Lab.40 · vista previa de Noticias con movimiento en la ventana del panel
   ['--check','src/output-news-motion-preview-adapter.js'],
   ['scripts/check-news-motion-preview-lab40.js'],
+  // Lab.41 · murmullos de Qwen antes de la primera palabra y retumbo grave en las pausas
+  {py:['-m','py_compile','src/qwen_onset_lab41.py']},
+  {py:['scripts/check-qwen-onset-lab41.py']},
 ];
 // Python: el mismo "python" que usa package.json (en Linux puede llamarse python3)
 function runPython(args){

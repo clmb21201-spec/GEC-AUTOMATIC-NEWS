@@ -143,6 +143,13 @@ Ver `INTEGRACION_MERLIN.md`, sección "Modelo y animación". Opciones nuevas en 
 - Colores del Diseño que volvían al amarillo: los demás «Guardar» del panel (Audio y locución, Ajustes, probar Claude…) mandan `settings` con la copia de `visual.output.noteDesign` que el panel cargó al abrirse y pisaban lo que había guardado el editor de Diseño. Ahora `settings:save` (main.js) descarta `noteDesign`, `youtubePromoDesign` y `youtubePromoCtaText` salvo que el guardado traiga `__designV2` (lo ponen `renderer-emission-design-v2.js` y el guardado de la promo en `renderer-stabilization-lab28.js`).
 - Prueba: `scripts/check-news-motion-preview-lab40.js`.
 
+## Lab.41 (murmullos de Qwen antes de la primera palabra)
+
+- Síntoma: al inicio de algunas notas (y en la prueba de voz) se oían uno o dos «mmm» y hasta 1 s de silencio antes de la primera palabra; en algunas pausas quedaba un retumbo de 20–70 Hz.
+- `src/qwen_onset_lab41.py` (lo copia `prepare-windows-runtime.ps1` junto al worker): `clean_head(audio, sr)` busca el comienzo de la voz (≥ 0,15 s con ≥ 70 % de cuadros sobre min(-35 dB, p90 − 18 dB) y ≥ 8 % de la energía entre 800 y 5000 Hz) y quita lo anterior solo si es silencio o murmullo: sonidos previos ≤ 0,5 s, con ≤ 10 % de agudos y separados de la voz por ≥ 0,3 s bajo -45 dB; si no, solo recorta el silencio antes del primer sonido. Deja 60 ms antes de la voz, fundido de 10 ms y nunca más de 3 s. `highpass(audio, sr)`: rampa coseno 40–70 Hz por FFT, sin desfase.
+- `tts_lab_worker.py`: `clean_onset` después de `fix_runaway` en los dos caminos (lotes y uno por uno), y el filtro sobre el audio unido antes de escribir el WAV; se omite en `batchBenchmarkMode`. El resultado trae `onset`. `services/ttsRunawayGuardLab34.js` registra los murmullos quitados en `logs/tts-runaway.log`.
+- Prueba: `scripts/check-qwen-onset-lab41.py` (la detección, con señales sintéticas, solo si hay numpy).
+
 ## Pendiente
 
 - Integrar en modo Merlín el envío por NDI (hoy NDI queda bloqueado con aviso en modo Merlín).
