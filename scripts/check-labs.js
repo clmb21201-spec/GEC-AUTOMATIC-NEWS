@@ -16,6 +16,25 @@ const STEPS=[
   ['scripts/check-tts-runaway-lab34.js'],
   {py:['-m','py_compile','src/qwen_runaway_lab34.py']},
   {py:['scripts/check-qwen-runaway-lab34.py']},
+  // Lab.35 · control desde el celular con ntfy
+  ['--check','src/services/remoteNtfyLab35.js'],
+  ['--check','src/renderer-remote-ntfy-lab35.js'],
+  ['scripts/check-remote-ntfy-lab35.js'],
+  // Lab.36 · audios de voz para edición (.wav + .txt + .srt) y Merlín solo con su página cargada
+  ['--check','src/services/voiceArchiveLab36.js'],
+  ['--check','src/renderer-voice-archive-lab36.js'],
+  ['scripts/check-voice-archive-lab36.js'],
+  // Lab.37 · noticias con movimiento en la salida clásica (planos, datos clave, voz, ticker, golpe de marca)
+  ['--check','src/services/newsMotionLab37.js'],
+  ['--check','src/output-news-motion-lab37.js'],
+  ['--check','src/renderer-news-motion-lab37.js'],
+  ['scripts/check-news-motion-lab37.js'],
+  // Lab.38 · intervenciones de la vista clásica por perfil (15 versiones, logo, fondo, frases, cierre)
+  ['--check','src/services/classicHostLab38.js'],
+  ['--check','src/output-classic-host-render-lab38.js'],
+  ['--check','src/output-classic-host-lab38.js'],
+  ['--check','src/renderer-classic-host-lab38.js'],
+  ['scripts/check-classic-host-lab38.js'],
 ];
 // Python: el mismo "python" que usa package.json (en Linux puede llamarse python3)
 function runPython(args){

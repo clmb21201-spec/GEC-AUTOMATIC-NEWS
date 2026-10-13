@@ -324,9 +324,9 @@ const presenterHost=(()=>{
     fs.writeFileSync(out,Buffer.concat([head,...ws.map(w=>w.data)]));return starts;}
   // ---- titulares periódicos: entrada fija + titulares reales de las próximas noticias listas en la cola
   let lastTit=0,titPrep=null,titReady=null;
-  const titEveryMs=()=>Math.max(0,Number(presenterCfg().titulares?.cadaMinutos??25))*60000,titCount=()=>Math.max(2,Math.min(5,Number(presenterCfg().titulares?.cantidad??3)));
-  function upcoming(){return (automation?.queue||[]).filter(x=>x.status==='LISTA'&&x.result?.title).slice(0,titCount()).map(x=>({title:x.result.title,category:x.result.category||x.story?.category||'',isExclusive:!!(x.result?.isExclusive||x.isExclusive),image:x.image||x.fallback||''}));}
-  function pickText(key){const list=loadPhrases()[key]||[];return list.length?list[Math.floor(Math.random()*list.length)]:'';}
+  const titEveryMs=()=>classicOn()?Math.max(0,Number(classicHost().titulares().everyMin)||0)*60000:Math.max(0,Number(presenterCfg().titulares?.cadaMinutos??25))*60000,titCount=()=>classicOn()?Math.max(2,Math.min(5,Number(classicHost().titulares().count)||3)):Math.max(2,Math.min(5,Number(presenterCfg().titulares?.cantidad??3)));
+  function upcoming(n=titCount()){return (automation?.queue||[]).filter(x=>x.status==='LISTA'&&x.result?.title).slice(0,n).map(x=>({title:x.result.title,category:x.result.category||x.story?.category||'',isExclusive:!!(x.result?.isExclusive||x.isExclusive),image:x.image||x.fallback||''}));}
+  function pickText(key){const list=phraseList(key);return list.length?list[Math.floor(Math.random()*list.length)]:'';}
   function prepareTitulares(){if(titPrep)return titPrep;titPrep=(async()=>{const items=upcoming();if(items.length<2)return null;const s=settingsStore.load(),texts=[pickText('titulares_intro')||'Estos son los titulares de esta hora.',...items.map(x=>x.title)],parts=[];
       for(const t of texts){let spoken=t;try{const loc=await pronunciation?.normalize?.(t,{smart:s.tts?.pronunciationSmart!==false});if(loc?.text)spoken=loc.text;}catch{}const a=await kokoro.generate(spoken,{voice:s.tts.voice,speed:s.tts.speed});if(!a?.path)throw new Error('el TTS no devolvió audio');parts.push(a.path);}
       fs.mkdirSync(cacheDir(),{recursive:true});const out=path.join(cacheDir(),`titulares-${Date.now()}.wav`),starts=concatWavs(parts,out);try{for(const f of fs.readdirSync(cacheDir()))if(/^titulares-\d+\.wav$/.test(f)&&path.join(cacheDir(),f)!==out&&path.join(cacheDir(),f)!==titReady?.file)fs.unlinkSync(path.join(cacheDir(),f));}catch{}for(const p of parts)try{kokoro.cleanupAudio?.(p);}catch{}gains.delete(out);
@@ -336,18 +336,43 @@ const presenterHost=(()=>{
   function voiceKey(){const s=settingsStore?.load?.()||{};return JSON.stringify({voice:s.tts?.voice||'',speed:s.tts?.speed||1,engine:s.tts?.engine||s.tts?.primaryEngine||''});}
   function fileFor(text){return path.join(cacheDir(),crypto.createHash('sha1').update(voiceKey()+'|'+text).digest('hex').slice(0,16)+'.wav');}
   const ready=f=>{try{return fs.statSync(f).size>1000;}catch{return false;}};
-  const active=()=>{try{return readPresenter().mode==='merlin'&&(currentDesign?.()||{}).format!=='9:16';}catch{return false;}};
-  async function ensureClips(){if(generating)return generating;if(!kokoro||!settingsStore)return;generating=(async()=>{const ph=loadPhrases();fs.mkdirSync(cacheDir(),{recursive:true});
-    for(const seg of SEGS)for(const text of ph[seg]){const f=fileFor(text);if(ready(f))continue;
+  // Merlín solo habla si la salida muestra de verdad su página: si WebGL o el modelo fallan, la salida vuelve a output.html
+  // aunque el modo siga en 'merlin', y la clásica trataba la intervención como una noticia vacía (y su 'ended' como el de la noticia).
+  const merlinPage=()=>{try{const w=typeof outputWindow!=='undefined'?outputWindow:null;if(!w||w.isDestroyed())return true;const u=String(w.webContents.getURL()||'');return !u||/output-merlin\.html/i.test(u);}catch{return true;}};
+  const active=()=>{try{return readPresenter().mode==='merlin'&&(currentDesign?.()||{}).format!=='9:16'&&merlinPage();}catch{return false;}};
+  // Lab.38: intervenciones en la vista clásica, por perfil (services/classicHostLab38.js). Mismo flujo que Merlín, con las
+  // frases, versiones y datos de cada perfil; Merlín conserva las suyas. Solo con la página clásica en la salida.
+  const classicHost=()=>globalThis.__gecClassicHost||null;
+  const classicOn=()=>{try{const c=classicHost();if(!c||active()||!c.config().enabled)return false;const w=typeof outputWindow!=='undefined'?outputWindow:null;if(!w||w.isDestroyed())return true;const u=String(w.webContents.getURL()||'');return !u||/(?:^|[\/])output\.html/i.test(u);}catch{return false;}};
+  const hostActive=()=>active()||classicOn();
+  const phraseList=key=>classicOn()?classicHost().phrasesNow(key):(loadPhrases()[key]||[]);
+  async function ensureClips(){if(generating)return generating;if(!kokoro||!settingsStore)return;generating=(async()=>{const classic=classicOn(),ph=classic?null:loadPhrases();fs.mkdirSync(cacheDir(),{recursive:true});
+    for(const seg of SEGS)for(const text of(classic?classicHost().phrasesAll(seg):ph[seg])){const f=fileFor(text);if(ready(f))continue;
       try{const s=settingsStore.load(),a=await kokoro.generate(text,{voice:s.tts.voice,speed:s.tts.speed});if(a?.path&&fs.existsSync(a.path)){fs.copyFileSync(a.path,f);durations[f]=Number(a.durationSec)||0;try{kokoro.cleanupAudio?.(a.path);}catch{}}}
       catch(e){logEvent('PRESENTER_TTS',`${seg}: ${e.message||e}`);}}
   })().finally(()=>{generating=null;});return generating;}
-  function pick(seg){const list=(loadPhrases()[seg]||[]).map((text,i)=>({text,i,file:fileFor(text)})).filter(x=>ready(x.file));if(!list.length)return null;
+  function pick(seg){const list=phraseList(seg).map((text,i)=>({text,i,file:fileFor(text)})).filter(x=>ready(x.file));if(!list.length)return null;
     let opts=list.filter(x=>x.i!==lastIdx[seg]);if(!opts.length)opts=list;const c=opts[Math.floor(Math.random()*opts.length)];lastIdx[seg]=c.i;return{...c,durationSec:durations[c.file]||0};}
   function clearPending(){clearTimeout(pendingTimer);pendingTimer=null;const p=pending;pending=null;return p;}
   function finish(reason){const p=clearPending();if(p?.after)try{p.after(reason);}catch(e){logEvent('PRESENTER_AFTER',e.message||e);}}
-  function playHost(seg,origDeliver,after){const clip=pick(seg);if(!clip){ensureClips().catch(()=>{});return false;}
-    const ok=origDeliver({kind:'host',segment:seg,title:'',summary:'',audioUrl:toUrl(clip.file).href,audioDurationSec:clip.durationSec,hostText:clip.text,speechSegments:speechSegmentsFor(clip.file),audioGainDb:gainDbFor(clip.file)},'automatic',false);
+  function playHost(seg,origDeliver,after,extra={}){
+    const classic=classicOn();if(classic&&!classicHost().segOn(seg))return false;
+    if(classic){const dyn=classicHost().dynamicPhrase(seg);if(dyn)return playDynamic(seg,dyn,origDeliver,after,extra);}
+    const clip=pick(seg);if(!clip){ensureClips().catch(()=>{});return false;}
+    return sendHost(seg,clip,origDeliver,after,classic?{...extra,...classicExtra()}:{});}
+  // Lab.38: datos de la placa clásica (próxima emisión para la despedida, próximas noticias)
+  function classicExtra(){return{hostFlavor:'clasica',nextEmission:classicHost()?.nextEmission?.()||'',upcoming:upcoming(5)};}
+  // frase con {hora}: se genera en el momento (hasta 12 s); si no llega, otra frase ya generada o se sigue sin intervención
+  function playDynamic(seg,text,origDeliver,after,extra){
+    const mine={after};pending=mine;clearTimeout(pendingTimer);pendingTimer=setTimeout(()=>finish('timeout'),40000);
+    const timeout=new Promise(r=>setTimeout(()=>r(null),12000));
+    Promise.race([speakToFile(text),timeout]).then(f=>{if(pending!==mine)return;clearTimeout(pendingTimer);pending=null;
+      const clip=f?{text,file:f,durationSec:durations[f]||0}:pick(seg);
+      if(!clip||!sendHost(seg,clip,origDeliver,after,{...extra,...classicExtra()})){try{after('skip');}catch(e){logEvent('PRESENTER_AFTER',e.message||e);}}}).catch(e=>{logEvent('PRESENTER_TTS',`${seg}: ${e.message||e}`);if(pending===mine)finish('error');});
+    return true;}
+  async function speakToFile(text){const f=fileFor(text);if(ready(f))return f;const s=settingsStore.load(),a=await kokoro.generate(text,{voice:s.tts.voice,speed:s.tts.speed});if(!a?.path||!fs.existsSync(a.path))return null;fs.mkdirSync(cacheDir(),{recursive:true});fs.copyFileSync(a.path,f);durations[f]=Number(a.durationSec)||0;try{kokoro.cleanupAudio?.(a.path);}catch{}return f;}
+  function sendHost(seg,clip,origDeliver,after,extra){
+    const ok=origDeliver({kind:'host',segment:seg,title:'',summary:'',audioUrl:toUrl(clip.file).href,audioDurationSec:clip.durationSec,hostText:clip.text,speechSegments:speechSegmentsFor(clip.file),audioGainDb:gainDbFor(clip.file),...extra},'automatic',false);
     if(!ok)return false;pending={after};pendingTimer=setTimeout(()=>finish('timeout'),Math.min(16000,Math.max(5000,((clip.durationSec||9)+4)*1000)));logEvent('PRESENTER_HOST',`${seg}: ${clip.text}`);return true;}
   function notice(text){try{automation?.state?.({notice:text});}catch{}}
   function farewell(origDeliver,origControl){stopping=false;clearTimeout(stopTimer);stopTimer=null;started=false;lastKind='none';
@@ -357,7 +382,7 @@ const presenterHost=(()=>{
   function patchStop(origDeliver,origControl){if(stopPatched||!automation||typeof automation.stopEmission!=='function')return;stopPatched=true;
     const origStop=automation.stopEmission.bind(automation),origStart=typeof automation.startEmission==='function'?automation.startEmission.bind(automation):null;
     automation.stopEmission=function(...args){
-      if(!active()||!started||stopping)return origStop(...args);
+      if(!hostActive()||!started||stopping)return origStop(...args);
       const newsOnAir=automation.currentKind==='news'&&!pending;
       if(newsOnAir){stopping=true;suppressStop=true;let r;try{r=origStop(...args);}finally{suppressStop=false;}
         const prog=currentOutputProgram||{},left=Math.max(0,(Number(prog.durationSec)||0)-(Number(prog.currentSec)||0));
@@ -368,7 +393,7 @@ const presenterHost=(()=>{
     if(origStart)automation.startEmission=function(...args){if(stopping){stopping=false;clearTimeout(stopTimer);stopTimer=null;logEvent('PRESENTER_STOP','cancelado: la emisión se reanudó');}return origStart(...args);};
     ipcMain.on('output:playback',(_,ev)=>{if(stopping&&ev&&(ev.type==='ended'||ev.type==='error'))farewell(origDeliver,origControl);});}
   function deliver(payload,source,autoOpen,origDeliver,origControl){
-    if(source!=='automatic'||!active()||payload?.kind==='host')return origDeliver(payload,source,autoOpen);
+    if(source!=='automatic'||!hostActive()||payload?.kind==='host')return origDeliver(payload,source,autoOpen);
     patchStop(origDeliver,origControl);if(pending)finish('superseded');
     const kind=payload?.mediaRole==='ad'?'ad':(payload?.kind==='canned'?'canned':'news');
     if(kind==='news'&&payload?.audioUrl&&payload.audioGainDb==null)payload={...payload,audioGainDb:gainDbFor(fileOf(payload.audioUrl))};
@@ -377,12 +402,13 @@ const presenterHost=(()=>{
     if(!started)lastTit=Date.now();started=true;lastKind=kind;
     // titulares: se preparan ~90 s antes de tocar y salen antes de una noticia (nunca junto con otra intervención)
     const every=titEveryMs();
-    if(every&&kind==='news'){const since=Date.now()-lastTit;
+    if(every&&kind==='news'&&(!classicOn()||classicHost().segOn('titulares'))){const since=Date.now()-lastTit;
       if(since>=every-90000&&!titReady&&!titPrep)prepareTitulares();
       if(!seg&&since>=every&&titReady&&Date.now()-titReady.at<10*60000){const t=titReady;titReady=null;lastTit=Date.now();
-        const ok=origDeliver({kind:'host',segment:'titulares',title:'',summary:'',audioUrl:toUrl(t.file).href,audioDurationSec:t.durationSec,speechSegments:speechSegmentsFor(t.file),hostText:t.text,headlines:t.items,headlinesIntroSec:t.introSec,headlineMarks:t.marks,audioGainDb:gainDbFor(t.file)},'automatic',false);
+        const ok=origDeliver({kind:'host',segment:'titulares',title:'',summary:'',audioUrl:toUrl(t.file).href,audioDurationSec:t.durationSec,speechSegments:speechSegmentsFor(t.file),hostText:t.text,headlines:t.items,headlinesIntroSec:t.introSec,headlineMarks:t.marks,audioGainDb:gainDbFor(t.file),...(classicOn()?classicExtra():{})},'automatic',false);
         if(ok){pending={after:()=>origDeliver(payload,source,autoOpen)};pendingTimer=setTimeout(()=>finish('timeout'),Math.min(60000,(t.durationSec+5)*1000));logEvent('PRESENTER_HOST',`titulares: ${t.items.length}`);return true;}}}
-    if(seg&&playHost(seg,origDeliver,()=>origDeliver(payload,source,autoOpen)))return true;
+    const extra=seg==='pase'?{next:{kind,title:String(payload?.title||''),videoUrl:payload?.videoUrl||''}}:seg==='regreso'?{next:{kind,title:String(payload?.title||''),category:payload?.category||'',image:payload?.image||payload?.fallbackImage||''}}:{};
+    if(seg&&playHost(seg,origDeliver,()=>origDeliver(payload,source,autoOpen),extra))return true;
     return origDeliver(payload,source,autoOpen);}
   function control(action,origControl,origDeliver){const a=String(action||'');
     if(a==='stop'&&suppressStop)return true;
@@ -391,9 +417,9 @@ const presenterHost=(()=>{
     if(a==='stop'&&pending)clearPending();return origControl(action);}
   ipcMain.on('presenter:hostPlayback',(_,ev)=>{if(ev&&(ev.type==='ended'||ev.type==='error'))finish(ev.type);});
   // genera (una sola vez, con caché en disco) los audios de las frases cuando el modo Merlín está activo
-  app.whenReady().then(()=>{const t=setInterval(()=>{if(!kokoro||!settingsStore)return;clearInterval(t);if(active())setTimeout(()=>ensureClips().catch(()=>{}),20000);},2000);}).catch(()=>{});
+  app.whenReady().then(()=>{const t=setInterval(()=>{if(!kokoro||!settingsStore)return;clearInterval(t);if(hostActive())setTimeout(()=>ensureClips().catch(()=>{}),20000);},2000);}).catch(()=>{});
   // titularesNow(): hace que los titulares salgan en la próxima noticia (útil para probar o para un botón manual)
-  return{deliver,control,ensureClips,titularesNow:()=>{lastTit=Date.now()-titEveryMs()-1000;prepareTitulares();},state:()=>({started,lastKind,pending:!!pending,titReady:!!titReady})};
+  return{deliver,control,ensureClips,speakToFile,hostActive,classicOn,titularesNow:()=>{lastTit=Date.now()-titEveryMs()-1000;prepareTitulares();},state:()=>({started,lastKind,pending:!!pending,titReady:!!titReady})};
 })();
 {const __origDeliverToOutput=deliverToOutput,__origControlOutput=controlOutput;
  deliverToOutput=function(payload,source,autoOpen=false){return presenterHost.deliver(payload,source,autoOpen,__origDeliverToOutput,__origControlOutput);};
@@ -424,4 +450,21 @@ const presenterNdiGuard=(()=>{const {OutputNdi}=require('./services/outputNdi'),
 })();
 // ---- Lab.33: API para el horario automático (services/broadcastScheduleLab33.js). "Emitir" hace lo mismo que el botón
 // Iniciar emisión (abre la salida si está cerrada); outputBusy indica si queda algo en pantalla (Merlín despidiéndose).
-globalThis.__gecScheduleApi={automation:()=>automation,dataDir:()=>dataDir||portableDataDir(),startEmission:()=>{if(!outputReady())createOutputWindow(false);return automation.startEmission();},outputBusy:()=>!!currentOutputProgram,notify:(ch,p)=>sendControl(ch,p),log:(k,m)=>logEvent(k,m)};
+globalThis.__gecScheduleApi={automation:()=>automation,dataDir:()=>dataDir||portableDataDir(),startEmission:()=>{if(!outputReady())createOutputWindow(false);return automation.startEmission();},outputBusy:()=>!!currentOutputProgram,notify:(ch,p)=>sendControl(ch,p),log:(k,m)=>logEvent(k,m),monitorFrame:()=>outputReady()?captureOutputMonitorFrame():Promise.resolve({ok:false,error:'La ventana de salida está cerrada.'})};
+// ---- Lab.37: noticias con movimiento en la salida clásica (services/newsMotionLab37.js). El diseño lleva la configuración
+// del perfil (design.newsMotion) y cada noticia p.motion (oraciones ancladas a la voz, datos clave y ticker).
+if(typeof enrichDesign==='function'&&typeof deliverToOutput==='function'){const __origEnrichMotion=enrichDesign;
+ enrichDesign=function(raw={}){const d=__origEnrichMotion(raw);try{const m=globalThis.__gecNewsMotion?.config?.();if(m)d.newsMotion=m;}catch{}return d;};
+ const __origDeliverMotion=deliverToOutput;
+ deliverToOutput=function(payload,source,autoOpen=false){try{if(globalThis.__gecNewsMotion&&payload&&(payload.kind||'news')==='news')payload=globalThis.__gecNewsMotion.enrich(payload);}catch(e){logEvent('NEWS_MOTION',e.message||e);}return __origDeliverMotion(payload,source,autoOpen);};
+ globalThis.__gecNewsMotionRefresh=()=>sendDesignLive();}
+// ---- Lab.38: intervenciones en la vista clásica (services/classicHostLab38.js + presenterHost). El diseño lleva los datos
+// del perfil (design.classicHost: programa, logo, versiones, fondo, música y cierre); presenterHost decide cuándo intervenir.
+if(typeof enrichDesign==='function'&&typeof presenterHost!=='undefined'){const __origEnrichClassic=enrichDesign;
+ let __classicProfile='';
+ // el diseño se recalcula al cambiar de perfil: ahí se preparan las frases del perfil nuevo
+ enrichDesign=function(raw={}){const d=__origEnrichClassic(raw);try{const c=globalThis.__gecClassicHost?.renderData?.();if(c)d.classicHost=c;const id=globalThis.__gecClassicHost?.profileId?.()||'';if(id&&id!==__classicProfile){const first=!__classicProfile;__classicProfile=id;if(!first)setTimeout(()=>{try{if(presenterHost.classicOn())presenterHost.ensureClips().catch(()=>{});}catch{}},3000);}}catch{}return d;};
+ globalThis.__gecPresenterHost={ensureClips:()=>presenterHost.ensureClips(),speak:async text=>{const f=await presenterHost.speakToFile(text);return f?{file:f}:null;},classicOn:()=>presenterHost.classicOn()};
+ globalThis.__gecClassicHostRefresh=()=>{sendDesignLive();if(presenterHost.classicOn())presenterHost.ensureClips().catch(()=>{});};
+ // las frases dependen del perfil, del saludo y del día: se completan cada 10 minutos (las ya generadas quedan en caché)
+ setInterval(()=>{try{if(presenterHost.classicOn())presenterHost.ensureClips().catch(()=>{});}catch{}},10*60000).unref?.();}

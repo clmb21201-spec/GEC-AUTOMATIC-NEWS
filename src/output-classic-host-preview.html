@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Vista previa · intervenciones</title>
+<link rel="stylesheet" href="output-classic-host-lab38.css">
+<style>
+html,body{margin:0;height:100%;background:#000;overflow:hidden}
+#wrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+#box{position:relative;overflow:hidden;background:#000}
+#chLayer{display:block}
+</style>
+</head>
+<body>
+<div id="wrap"><div id="box"><div id="chLayer" class="on"></div></div></div>
+<script src="output-classic-host-render-lab38.js"></script>
+<script>
+// Lab.38 · vista previa del panel: misma placa que la salida, con datos de ejemplo y un reloj simulado que se repite.
+'use strict';
+(function(){
+  const box=document.getElementById('box'),layer=document.getElementById('chLayer');
+  const DEMO=[{title:'Perú vence 2-0 a Bolivia y sube al quinto lugar de las eliminatorias',category:'Deportes'},{title:'El dólar cierra a la baja por tercer día consecutivo',category:'Economía'},{title:'Congreso aprueba en primera votación la reforma del sistema electoral',category:'Política'},{title:'Lluvias intensas obligan a evacuar a miles en el sur de Brasil',category:'Mundo'},{title:'Minsa amplía la campaña de vacunación a todos los distritos de Lima',category:'Salud'}];
+  let state=null,ctl=null,t0=0,dur=8,raf=0;
+  function size(){const v=state&&state.fmt==='v',W=innerWidth,H=innerHeight;let w=W,h=W*(v?16/9:9/16);if(h>H){h=H;w=H*(v?9/16:16/9);}box.style.width=w+'px';box.style.height=h+'px';ctl?.fit?.();}
+  function play(){
+    if(!state)return;size();
+    const r=document.documentElement.style,col=state.colors||{};
+    r.setProperty('--cat-bg',col.catBg||'#F7C600');r.setProperty('--cat-color',col.catTx||'#000');if(col.font)r.setProperty('--title-font-family',`"${col.font}"`);
+    const text=String(state.text||''),n=text.split(/\s+/).filter(Boolean).length;dur=Math.max(5,n*.38+1.2);
+    const heads=DEMO.slice(0,state.count||3),marks=state.seg==='tit'?heads.map((_,i)=>1.6+i*((dur-1.6)/heads.length)):null;
+    ctl?.destroy?.();
+    ctl=GECClassicHostRender.mount(layer,{seg:state.seg,v:state.v,fmt:state.fmt,tt:!!state.tt,data:{...state.data,heads,next:state.seg==='reg'?{title:DEMO[0].title,category:DEMO[0].category}:state.seg==='pase'?{title:'Lima en 360°: el centro histórico como nunca lo viste',kind:'content'}:null,text,duration:dur,marks}});
+    t0=performance.now();cancelAnimationFrame(raf);
+    const step=()=>{const t=(performance.now()-t0)/1000;ctl.update(Math.min(t,dur));if(t<dur+2.5)raf=requestAnimationFrame(step);};raf=requestAnimationFrame(step);
+  }
+  addEventListener('message',e=>{const m=e.data||{};if(m.type==='gec-classic-host-preview'){state=m;play();}});
+  addEventListener('resize',size);
+  window.__preview={play:m=>{state=m;play();}};
+})();
+</script>
+</body>
+</html>
