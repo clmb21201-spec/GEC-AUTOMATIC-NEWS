@@ -29,6 +29,12 @@ const STEPS=[
   ['--check','src/output-news-motion-lab37.js'],
   ['--check','src/renderer-news-motion-lab37.js'],
   ['scripts/check-news-motion-lab37.js'],
+  // Lab.38 · intervenciones de la vista clásica por perfil (15 versiones, logo, fondo, frases, cierre)
+  ['--check','src/services/classicHostLab38.js'],
+  ['--check','src/output-classic-host-render-lab38.js'],
+  ['--check','src/output-classic-host-lab38.js'],
+  ['--check','src/renderer-classic-host-lab38.js'],
+  ['scripts/check-classic-host-lab38.js'],
 ];
 // Python: el mismo "python" que usa package.json (en Linux puede llamarse python3)
 function runPython(args){
