@@ -50,4 +50,5 @@ if(!gotLock){app.quit();}else{
   require('./services/ttsRunawayGuardLab34').installTtsRunawayGuardLab34();
   require('./services/remoteNtfyLab35').installRemoteNtfyLab35();
   require('./services/voiceArchiveLab36').installVoiceArchiveLab36();
+  require('./services/newsMotionLab37').installNewsMotionLab37();
 }

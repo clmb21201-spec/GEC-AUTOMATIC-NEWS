@@ -428,3 +428,10 @@ const presenterNdiGuard=(()=>{const {OutputNdi}=require('./services/outputNdi'),
 // ---- Lab.33: API para el horario automático (services/broadcastScheduleLab33.js). "Emitir" hace lo mismo que el botón
 // Iniciar emisión (abre la salida si está cerrada); outputBusy indica si queda algo en pantalla (Merlín despidiéndose).
 globalThis.__gecScheduleApi={automation:()=>automation,dataDir:()=>dataDir||portableDataDir(),startEmission:()=>{if(!outputReady())createOutputWindow(false);return automation.startEmission();},outputBusy:()=>!!currentOutputProgram,notify:(ch,p)=>sendControl(ch,p),log:(k,m)=>logEvent(k,m),monitorFrame:()=>outputReady()?captureOutputMonitorFrame():Promise.resolve({ok:false,error:'La ventana de salida está cerrada.'})};
+// ---- Lab.37: noticias con movimiento en la salida clásica (services/newsMotionLab37.js). El diseño lleva la configuración
+// del perfil (design.newsMotion) y cada noticia p.motion (oraciones ancladas a la voz, datos clave y ticker).
+if(typeof enrichDesign==='function'&&typeof deliverToOutput==='function'){const __origEnrichMotion=enrichDesign;
+ enrichDesign=function(raw={}){const d=__origEnrichMotion(raw);try{const m=globalThis.__gecNewsMotion?.config?.();if(m)d.newsMotion=m;}catch{}return d;};
+ const __origDeliverMotion=deliverToOutput;
+ deliverToOutput=function(payload,source,autoOpen=false){try{if(globalThis.__gecNewsMotion&&payload&&(payload.kind||'news')==='news')payload=globalThis.__gecNewsMotion.enrich(payload);}catch(e){logEvent('NEWS_MOTION',e.message||e);}return __origDeliverMotion(payload,source,autoOpen);};
+ globalThis.__gecNewsMotionRefresh=()=>sendDesignLive();}

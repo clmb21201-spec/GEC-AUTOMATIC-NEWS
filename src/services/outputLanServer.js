@@ -12,6 +12,7 @@ const STATIC_FILES=new Set([
   'output.js','output-0324.js','output-0325.js','output-0326.js','output-0328.js','output-0331.js','output-youtube-promo.js',
   'output-merlin-web.html','output-merlin.js','output-merlin.css',
   'output-youtube-promo-v2-lab29.css','output-youtube-promo-v2-lab29.js','output-stabilization-lab28.css',
+  'output-news-motion-lab37.css','output-news-motion-lab37.js',
   'vendor/three/three.min.js','vendor/three/GLTFLoader.js','vendor/three/RoomEnvironment.js',
   'assets/merlin/merlin-model.js','assets/merlin/presenter-config.js','assets/merlin/fondo.jpg','assets/merlin/silla.webp','assets/merlin/mesa.webp','assets/merlin/mic.webp','assets/merlin/vasos.webp'
 ]);

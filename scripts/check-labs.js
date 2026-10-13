@@ -24,6 +24,11 @@ const STEPS=[
   ['--check','src/services/voiceArchiveLab36.js'],
   ['--check','src/renderer-voice-archive-lab36.js'],
   ['scripts/check-voice-archive-lab36.js'],
+  // Lab.37 · noticias con movimiento en la salida clásica (planos, datos clave, voz, ticker, golpe de marca)
+  ['--check','src/services/newsMotionLab37.js'],
+  ['--check','src/output-news-motion-lab37.js'],
+  ['--check','src/renderer-news-motion-lab37.js'],
+  ['scripts/check-news-motion-lab37.js'],
 ];
 // Python: el mismo "python" que usa package.json (en Linux puede llamarse python3)
 function runPython(args){
