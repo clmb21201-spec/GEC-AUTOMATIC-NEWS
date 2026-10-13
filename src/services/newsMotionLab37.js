@@ -78,7 +78,8 @@ function alignSentences(sentences,segments,durationSec,spoken=''){
 }
 
 // ---------------------------------------------------------------- datos clave (sin IA)
-const NUM='\\d{1,3}(?:[.\\s]\\d{3})+(?:,\\d+)?|\\d+(?:[.,]\\d+)?';
+// Lab.46: también «3 mil 200» (una sola cifra)
+const NUM='\\d{1,3}\\smil\\s\\d{1,3}(?![\\d.,])|\\d{1,3}(?:[.\\s]\\d{3})+(?:,\\d+)?|\\d+(?:[.,]\\d+)?';
 const SCALE='(?:\\s(?:mil\\s)?(?:millones|millón|mil|billones))?';
 const RE_MONEY=new RegExp(`(?:S\\/\\.?|US\\$|\\$|€|£)\\s?(?:${NUM})${SCALE}`,'g');
 const RE_PCT=new RegExp(`(?:${NUM})\\s?(?:%|por\\s?ciento)`,'gi');
@@ -87,6 +88,10 @@ const SPORT=/\b(gol|goles|partido|venci[óo]|vence|derrot|empat|gan[óo]|gana|ca
 const UNITS='votos|personas|muertos|fallecidos|heridos|damnificados|afectados|casos|contagios|soles|d[óo]lares|euros|kil[óo]metros|km|metros|toneladas|puntos|viviendas|familias|trabajadores|estudiantes|alumnos|pasajeros|veh[íi]culos|hect[áa]reas|grados|detenidos|polic[íi]as|efectivos|colegios|hospitales|empresas|vuelos|kilos';
 const RE_QTY=new RegExp(`(?:${NUM})${SCALE}(?:\\sde)?\\s(?:${UNITS})(?:\\s(?:a\\sfavor|en\\scontra))?`,'gi');
 const MONTHS='enero|febrero|marzo|abril|mayo|junio|julio|agosto|setiembre|septiembre|octubre|noviembre|diciembre';
+// Lab.46: cifra con cualquier sustantivo (3 200 turistas, 3.200 computadoras), no solo los de UNITS. Sin años sueltos
+// (2025), sin cifras de una sola cifra sin separador y sin palabras que no son sustantivos.
+const RE_QTY_ANY=new RegExp(`(?:${NUM})${SCALE}(?:\\sde)?\\s(?:nuevos?\\s|nuevas?\\s)?[a-záéíóúñ]{4,}`,'g');
+const QTY_STOP=/\s(?:para|contra|hasta|desde|durante|según|entre|sobre|cuando|donde|mientras|aunque|porque|también|años?|veces|horas?|minutos?|segundos?|días?|semanas?|meses|enero|febrero|marzo|abril|mayo|junio|julio|agosto|setiembre|septiembre|octubre|noviembre|diciembre|fueron|eran|están|son|habían|tienen)$/i;
 const RE_DATE=new RegExp(`\\b\\d{1,2}\\sde\\s(?:${MONTHS})(?:\\sde(?:l)?\\s\\d{4})?`,'gi');
 const NAMEW='[A-ZÁÉÍÓÚÑ][a-záéíóúüñ]+';
 const NAME=`${NAMEW}(?:\\s(?:de\\s(?:la\\s|los\\s)?|del\\s)?${NAMEW}){1,3}`;
@@ -108,7 +113,7 @@ function labelAround(sentence,index,length){
   lead=words(lead,6,true).replace(/^(?:de|del|en|a|al|y|e|o|con|por|para)\s+/i,'');
   return cap(lead);
 }
-const tidy=s=>String(s||'').replace(/\s+/g,' ').replace(/\s?por\s?ciento/i,' %').trim();
+const tidy=s=>String(s||'').replace(/\s+/g,' ').replace(/\s?por\s?ciento/i,' %').replace(/\b(\d{1,3}) mil (\d{1,3})\b/,(m,a,b)=>`${a} ${b.padStart(3,'0')}`).trim();
 // candidatos de una oración: {type,big,label,index,length,cifra}
 function factsInSentence(s){
   const out=[],taken=[];
@@ -119,6 +124,7 @@ function factsInSentence(s){
   each(RE_PCT,m=>add({type:'cifra',big:tidy(m[0]),label:labelAround(s,m.index,m[0].length),cifra:true},m.index,m[0].length));
   if(SPORT.test(s))each(RE_SCORE,m=>add({type:'marcador',big:tidy(m[0]).replace(/\s/g,''),label:labelAround(s,m.index,m[0].length),cifra:true},m.index,m[0].length));
   each(RE_QTY,m=>add({type:'cifra',big:tidy(m[0]),label:labelAround(s,m.index,m[0].length),cifra:true},m.index,m[0].length));
+  each(RE_QTY_ANY,m=>{const num=m[0].match(/^[\d.,\s]+(?:mil\s\d+)?/)[0].trim();if(QTY_STOP.test(m[0])||/^(?:19|20)\d{2}$/.test(num)||/^\d$/.test(num))return;add({type:'cifra',big:tidy(m[0]),label:labelAround(s,m.index,m[0].length),cifra:true},m.index,m[0].length);});
   each(RE_ROLE_NAME,m=>{const i=m.index+m[0].lastIndexOf(m[2]);add({type:'persona',big:m[2],label:cap(m[1])},i,m[2].length);});
   each(RE_NAME_ROLE,m=>add({type:'persona',big:m[1],label:cap(m[2])},m.index,m[1].length));
   each(RE_ACR,m=>{const i=m.index+m[0].lastIndexOf(m[2]);add({type:'institucion',big:m[2],label:m[1]},i,m[2].length);});
@@ -136,7 +142,7 @@ function extractFacts({title='',summary='',sentences=[],firstScript=0,max=4}={})
   const cifras=cands.filter(c=>c.cifra),hero=cifras.find(c=>head.includes(key(c.big)))||cifras[0]||null;
   const picked=[],seen=new Set(),used=new Set();
   const take=c=>{if(!c||picked.length>=max||used.has(c.si)||seen.has(key(c.big))||key(c.big).length<2)return;picked.push(c);used.add(c.si);seen.add(key(c.big));};
-  take(hero);for(const c of cands)take(c);
+  take(hero);for(const c of [...cands].sort((a,b)=>a.si-b.si||(b.cifra?1:0)-(a.cifra?1:0)||a.index-b.index))take(c);
   return picked.map(c=>({type:c.type,big:c.big.slice(0,40),label:String(c.label||'').slice(0,60),si:c.si,frac:c.index/Math.max(1,String(sentences[c.si].text||sentences[c.si]).length),main:c===hero})).sort((a,b)=>a.si-b.si||a.frac-b.frac);
 }
 // segundo en que la voz nombra cada dato; mínimo 5,2 s entre uno y otro y cada uno ~4,4 s en pantalla

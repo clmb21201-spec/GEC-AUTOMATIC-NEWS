@@ -203,11 +203,18 @@ Ver `INTEGRACION_MERLIN.md`, sección "Modelo y animación". Opciones nuevas en 
     - horas con a. m. / p. m. («ocho y treinta de la noche»; madrugada / mañana / mediodía / tarde / noche). Conserva el punto solo si la abreviatura cerraba la oración;
     - hora seguida de «de la tarde» y similares;
     - ordinales (º ª ° er ra…, con «primer» / «tercer» delante del sustantivo, sin tocar «°C»);
-    - cifra + sustantivo femenino de una lista («mil doscientas personas», «veintiuna familias», «una persona»);
+    - «3 mil 200» → 3200;
+    - cifra + sustantivo femenino («mil doscientas personas», «tres mil doscientas computadoras», «veintiuna familias», «una persona», «trescientas mil personas», «un millón quinientas mil personas», «dos millones de personas»). Se reconoce por lista y por terminación (-as, -a, -ción, -sión, -dad, -tad, -tud, -umbre), menos excepciones masculinas (días, problemas, programas…), palabras de género común (turistas, atletas: masculino genérico) y palabras que no son sustantivos (para, hasta, cada…);
+    - miles con coma («3,200 autos» → 3200: una coma seguida de exactamente 3 cifras no es decimal);
     - decimales con punto: 1–2 cifras → «punto», con «%» → «por ciento». Los decimales con coma siguen leyéndose «coma».
   - `endWithPunctuation` envuelve `KokoroTTS.prototype.generate` (todas las voces, intervenciones, titulares y Merlín): si el texto no termina en . ! ? …, agrega un punto después de las comillas o paréntesis de cierre. Una coma o un punto y coma final pasan a punto.
 - `qwen_speed_lab31.py` `_trim`: al unir fragmentos deja 120 ms al final (antes 40), para no cortar la caída de la última palabra.
-- Prueba: `scripts/check-speech-numbers-lab46.js`, con la cadena completa.
+- Lab.32 (`documentCodesSpeechLab32.js`, `DOC`) también reconoce carpeta, carpeta fiscal, caso y denuncia, y expediente, informe y acta en minúscula: «la carpeta 17-2026» → «carpeta diecisiete, dos mil veintiséis». Caso, denuncia y carpeta exigen un año en el código, para no tocar «ese caso 2-1».
+- Dato grande de Noticias con movimiento (`newsMotionLab37.js`):
+  - `NUM` acepta «3 mil 200», que se muestra «3 200».
+  - `RE_QTY_ANY` toma una cifra con cualquier sustantivo (3 200 turistas, 3.200 computadoras). No toma años sueltos, cifras de un dígito, «años» u «horas», meses ni palabras que no son sustantivos.
+  - En cada oración, la cifra gana a la fecha, la persona o el lugar.
+- Prueba: `scripts/check-speech-numbers-lab46.js`, con la cadena completa y el dato grande.
 
 ## Pendiente
 

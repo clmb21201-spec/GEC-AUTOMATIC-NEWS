@@ -42,7 +42,30 @@ const cases=[
   ['Deuda de S/ 3.2 millones afecta educación en Piura','Deuda de tres punto dos millones de soles afecta educación en Piura'],
   ['Se registraron 12 500 casos.','Se registraron doce mil quinientos casos.'],
   ['ganó 3-1 al Cristal','ganó tres a uno al Cristal'],
-  ['N° 000081-2026-PE-ONP','número ochenta y uno, dos mil veintiséis, pe e, o ene pe']
+  ['N° 000081-2026-PE-ONP','número ochenta y uno, dos mil veintiséis, pe e, o ene pe'],
+  // femenino por terminación (no solo la lista), millones y coma de miles
+  ['Se entregaron 3.200 computadoras.','Se entregaron tres mil doscientas computadoras.'],
+  ['Se entregaron 3 200 computadoras.','Se entregaron tres mil doscientas computadoras.'],
+  ['Se vendieron 3,200 entradas.','Se vendieron tres mil doscientas entradas.'],
+  ['Se vendieron 3,200 autos.','Se vendieron tres mil doscientos autos.'],
+  ['Llegaron 1 500 000 personas.','Llegaron un millón quinientas mil personas.'],
+  ['Llegaron 2 000 000 personas.','Llegaron dos millones de personas.'],
+  ['Unos 3 mil 200 personas.','Unos tres mil doscientas personas.'],
+  ['300 mil personas','trescientas mil personas'],
+  ['Hubo 200 intervenciones y 21 detenciones.','Hubo doscientas intervenciones y veintiuna detenciones.'],
+  ['200 nuevas viviendas','doscientas nuevas viviendas'],
+  ['1 ley y 2 leyes','una ley y dos leyes'],
+  // lo masculino o de género común queda igual
+  ['Llegaron 3 200 turistas.','Llegaron tres mil doscientos turistas.'],
+  ['200 programas sociales','doscientos programas sociales'],
+  ['Duró 3 días.','Duró tres días.'],
+  ['dio 200 para cada familia','dio doscientos para cada familia'],
+  ['1 500 000 soles','un millón quinientos mil soles'],
+  // carpeta / expediente / caso con número y año (Lab.32)
+  ['La Fiscalía abrió la carpeta 17-2026 contra el alcalde.','La Fiscalía abrió la carpeta diecisiete, dos mil veintiséis contra el alcalde.'],
+  ['la carpeta fiscal 506-2025-MP-FN','la carpeta fiscal quinientos seis, dos mil veinticinco, eme pe, efe ene'],
+  ['el expediente 17-2026','el expediente diecisiete, dos mil veintiséis'],
+  ['en ese caso 2-1 en el marcador','en ese caso dos a uno en el marcador']
 ];
 for(const [x,want] of cases)eq(spoken(x),want,x);
 // punto final de cada locución (titulares de «Titulares de esta hora», intervenciones)
@@ -51,6 +74,15 @@ eq(N.endWithPunctuation('¿Qué pasará con el dólar?'),'¿Qué pasará con el 
 eq(N.endWithPunctuation('Dijo «no habrá cambios»'),'Dijo «no habrá cambios».','punto después de la comilla de cierre');
 eq(N.endWithPunctuation('Seguimos con más noticias,  '),'Seguimos con más noticias.','coma final pasa a punto');
 eq(N.endWithPunctuation('Ya terminó.'),'Ya terminó.','con punto queda igual');
+// dato grande de Noticias con movimiento (Lab.37)
+const NM=require(path.join(src,'newsMotionLab37'));
+const big=x=>NM.factsInSentence(x).map(f=>f.big);
+eq(JSON.stringify(big('Unos 3 mil 200 personas.')),'["3 200 personas"]','«3 mil 200» es una sola cifra');
+eq(JSON.stringify(big('Unos 3 200 turistas llegaron.')),'["3 200 turistas"]','cifra con un sustantivo fuera de la lista');
+eq(JSON.stringify(big('Se entregaron 3.200 computadoras a colegios.')),'["3.200 computadoras"]','computadoras');
+eq(JSON.stringify(big('En 2025 durante el verano')),'[]','un año suelto no es dato');
+eq(JSON.stringify(big('Tiene 25 años de experiencia.')),'[]','años no es dato');
+eq(JSON.stringify(NM.extractFacts({title:'x',summary:'',sentences:NM.sentencesOf('Llegaron 3 200 turistas, informó el 3 de octubre.'),firstScript:0}).map(f=>f.big)),'["3 200 turistas"]','la cifra gana a la fecha en la misma oración');
 const boot=fs.readFileSync(path.join(__dirname,'..','src','bootstrap-v2lab.js'),'utf8');
 ok(boot.indexOf('installSpeechNumbersLab46')>0&&boot.indexOf('installSpeechNumbersLab46')<boot.indexOf('installMoneySpeechLab45'),'Lab.46 se instala antes que Lab.45 (el dinero corre primero)');
 const py=fs.readFileSync(path.join(__dirname,'..','src','qwen_speed_lab31.py'),'utf8');

@@ -30,11 +30,30 @@ const AMPM='(a|p)\\.?\\s?m\\.?';
 const FEM=['persona','víctima','familia','vivienda','casa','tonelada','hectárea','escuela','empresa','institución','mujer','niña','muerte','vida','unidad','denuncia','llamada','vacuna','dosis','cama','plaza','cuadra','calle','región','provincia','comunidad','semana','cabeza','especie','ciudad','obra','vez','prueba','hora','entrada','firma','embarcación','vía','línea','comisaría','sede','plataforma','universidad','institución educativa','madre','trabajadora','agencia','tienda','mina','central','planta','zona','localidad','oficina','muestra','fecha','jornada','etapa','fase','pista','carretera','obra pública','acción','operación','intervención','detención','solicitud','queja','multa','sanción','licencia','postulación','candidatura','lista','mesa','cédula','urna','encuesta','pregunta','respuesta'];
 const FEM_RX=FEM.map(w=>w.replace(/ /g,'\\s+')).sort((a,b)=>b.length-a.length).map(w=>`${w}(?:s|es)?`).join('|');
 function feminine(digits){
-  const n=Number(digits);if(!Number.isSafeInteger(n)||n<1||n>=1e6)return null;
-  let w=words(n);
-  w=w.replace(/ientos(?=\s|$)/g,'ientas');
-  w=w.replace(/(^|\s)uno$/,'$1una').replace(/veintiuno$/,'veintiuna').replace(/(^|\s)un mil(?=\s|$)/,'$1mil');
-  return w;
+  const n=Number(digits);if(!Number.isSafeInteger(n)||n<1||n>=1e12)return null;
+  const w=words(n);
+  // con millones: «dos millones de personas»; «un millón quinientas mil personas» (solo lo que va después del millón)
+  if(n>=1e6){
+    if(n%1e6===0)return `${w} de`;
+    const m=w.match(/^(.*\bmill(?:ón|ones))\s+(.*)$/);if(!m)return w;
+    return `${m[1]} ${fem(m[2])}`;
+  }
+  return fem(w);
+}
+function fem(w){
+  return String(w).replace(/ientos(?=\s|$)/g,'ientas').replace(/(^|\s)uno$/,'$1una').replace(/veintiuno$/,'veintiuna').replace(/(^|\s)un mil(?=\s|$)/,'$1mil');
+}
+// ¿sustantivo femenino? lista + terminaciones (-as, -a, -ción, -sión, -dad, -tad, -tud, -umbre), menos las excepciones
+const MASC=new Set(['días','día','problemas','problema','programas','programa','sistemas','sistema','temas','tema','mapas','mapa','climas','clima','idiomas','idioma','planetas','planeta','poemas','poema','dramas','drama','cometas','esquemas','esquema','dilemas','dilema','fantasmas','pijamas','diplomas','diploma','gramos','kilogramos','más','atlas','gas','papás','sofás','sofá','lemas','lema','enigmas','emblemas','teoremas','dogmas','aromas','prismas','síntomas','síntoma','panoramas','crucigramas','sismas']);
+// palabras que siguen a una cifra y no son sustantivos («200 para cada familia», «3 200 hasta mayo»)
+const NOT_NOUN=new Set(['para','contra','hasta','nada','cada','ahora','esa','esas','esta','estas','otra','otras','toda','todas','sola','solas','apenas','fuera','era','eran','sería','había','tenía','estaba','quedaba','llegaba','ya','pasa','queda','llega','resta','falta','sobra','suma','alcanza','supera','más','menos']);
+const COMMON=/(?:istas?|etas?|cidas?|iatras?)$/; // turistas, atletas, homicidas, pediatras: género común → masculino genérico
+const FEM_ONLY=new RegExp(`^(?:${FEM_RX})$`,'iu');
+function isFeminineNoun(w){
+  const x=String(w||'').toLowerCase();
+  if(x.length<3||MASC.has(x)||COMMON.test(x)||NOT_NOUN.has(x)||/(?:aba|ía|ra|ase|mente)$/.test(x)&&!FEM_ONLY.test(x)&&!/(?:ura|era|ora|ería|ría)s?$/.test(x))return false;
+  if(FEM_ONLY.test(x)||/^(?:leyes|ley|mujeres|veces|redes|red|sedes|naves|nave|llaves|calles|noches|noche|tardes|clases|clase|partes|parte|muertes|madres|gente)$/.test(x))return true;
+  return x.length>=4&&/(?:as|a|ción|ciones|sión|siones|dad|dades|tad|tades|tud|tudes|umbre|umbres)$/.test(x);
 }
 
 function speakNumbers(input){
@@ -67,10 +86,16 @@ function speakNumbers(input){
     if(/^er$/i.test(mark))w=w.replace(/primero$/,'primer').replace(/tercero$/,'tercer');
     return hit(`${w}${gap||''}`);
   });
-  // 4) cifra + sustantivo femenino (1.200 personas, 21 familias, 1 persona); miles con punto o espacio
-  s=s.replace(new RegExp(`(?<![\\p{L}\\p{N}:.,])(\\d{1,3}(?:[.\\u00a0 ]\\d{3})+|\\d+)(?![.,]\\d)(\\s+)(${FEM_RX})${R}`,'giu'),(m,num,sp,noun)=>{
-    const w=feminine(num.replace(/[.  ]/g,''));return w?hit(`${w}${sp}${noun}`):m;
+  // 4a) «3 mil 200» → 3200 (una sola cifra)
+  s=s.replace(/(?<![\d.,])(\d{1,3})\s+mil\s+(\d{1,3})(?![\d.,])/g,(m,a,b)=>hit(String(Number(a)*1000+Number(b))));
+  // 4b) cifra + sustantivo femenino (1.200 personas, 3,200 computadoras, 21 familias, 1 persona, 300 mil personas, 1 500 000 personas)
+  s=s.replace(new RegExp(`(?<![\\p{L}\\p{N}:.,])(\\d{1,3}(?:[.,\\u00a0 ]\\d{3})+|\\d+)(?![.,]\\d)(\\s+mil)?(\\s+)(\\p{Ll}\\p{L}*)${R}`,'gu'),(m,num,mil,sp,noun)=>{
+    if(!isFeminineNoun(noun))return m;
+    const n=Number(num.replace(/[.,\u00a0 ]/g,''))*(mil?1000:1);
+    const w=feminine(String(n));return w?hit(`${w}${sp}${noun}`):m;
   });
+  // 4c) miles con coma (3,200 autos): una coma seguida de exactamente 3 cifras no es decimal
+  s=s.replace(/(?<![\d.,])(\d{1,3})((?:,\d{3})+)(?![\d]|[.,]\d)/g,(m,a,rest)=>hit(a+rest.replace(/,/g,'')));
   // 5) decimales con punto (1 o 2 cifras después del punto; 3 cifras = miles): 3.5% → tres punto cinco por ciento
   s=s.replace(new RegExp(`(?<![\\p{L}\\p{N}.,/:])(\\d+)\\.(\\d{1,2})(?![\\d]|\\.\\d|:\\d)(\\s?%)?`,'gu'),(m,a,b,pct)=>{
     const dec=/^0/.test(b)?b.split('').map(words).join(' '):words(b);
