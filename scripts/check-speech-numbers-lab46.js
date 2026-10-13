@@ -83,6 +83,15 @@ eq(JSON.stringify(big('Se entregaron 3.200 computadoras a colegios.')),'["3.200 
 eq(JSON.stringify(big('En 2025 durante el verano')),'[]','un año suelto no es dato');
 eq(JSON.stringify(big('Tiene 25 años de experiencia.')),'[]','años no es dato');
 eq(JSON.stringify(NM.extractFacts({title:'x',summary:'',sentences:NM.sentencesOf('Llegaron 3 200 turistas, informó el 3 de octubre.'),firstScript:0}).map(f=>f.big)),'["3 200 turistas"]','la cifra gana a la fecha en la misma oración');
+// red de seguridad: la cadena devolvió cifras con el normalizador encendido (regla del paquete rota, etc.)
+{const os=require('os'),d=fs.mkdtempSync(path.join(os.tmpdir(),'sn46-'));
+ const self={dataDir:d,getSettings:()=>({tts:{}})};
+ const r=N.digitSafetyNet(self,{text:'Desaparición de 3358 galones el 16 de agosto de 2025.',speechFallbackReason:'0328: regla rota'});
+ eq(r.text,'Desaparición de tres mil trescientos cincuenta y ocho galones el dieciséis de agosto de dos mil veinticinco.','la red de seguridad convierte las cifras que quedaron');
+ ok(/CORREGIDO · motivo: 0328: regla rota/.test(fs.readFileSync(path.join(d,'logs','speech-fallback.log'),'utf8')),'queda el motivo en logs/speech-fallback.log');
+ eq(N.digitSafetyNet({getSettings:()=>({tts:{speechNormalizerEnabled:false}})},{text:'3358 galones'}).text,'3358 galones','con el normalizador apagado no toca nada');
+ eq(N.digitSafetyNet(self,{text:'diésel B5 UV'}).text,'diésel B5 UV','cifras pegadas a letras no cuentan');
+ fs.rmSync(d,{recursive:true,force:true});}
 const boot=fs.readFileSync(path.join(__dirname,'..','src','bootstrap-v2lab.js'),'utf8');
 ok(boot.indexOf('installSpeechNumbersLab46')>0&&boot.indexOf('installSpeechNumbersLab46')<boot.indexOf('installMoneySpeechLab45'),'Lab.46 se instala antes que Lab.45 (el dinero corre primero)');
 const py=fs.readFileSync(path.join(__dirname,'..','src','qwen_speed_lab31.py'),'utf8');

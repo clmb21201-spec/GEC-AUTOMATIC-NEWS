@@ -214,6 +214,10 @@ Ver `INTEGRACION_MERLIN.md`, sección "Modelo y animación". Opciones nuevas en 
   - `NUM` acepta «3 mil 200», que se muestra «3 200».
   - `RE_QTY_ANY` toma una cifra con cualquier sustantivo (3 200 turistas, 3.200 computadoras). No toma años sueltos, cifras de un dígito, «años» u «horas», meses ni palabras que no son sustantivos.
   - En cada oración, la cifra gana a la fecha, la persona o el lugar.
+- Red de seguridad (`digitSafetyNet`, en el envoltorio de Lab.46, después de toda la cadena):
+  - Síntoma: en notas reales la locución llegaba a Qwen con las cifras escritas («3358 galones», «32 años», «2025»). Pasa cuando la 0328 cae al texto sin convertir; por ejemplo, si una regla del paquete actualizable o el aprendizaje guardado hace fallar `structuralPreNormalize` o `validateSpeech`.
+  - Ahora, con el normalizador encendido, si quedan cifras sueltas se vuelve a convertir con las reglas base (sin reglas externas). Cada caso queda en `logs/speech-fallback.log` con el motivo que dio la cadena.
+  - Las cifras pegadas a letras («B5», «COVID-19») no cuentan. Con el normalizador apagado no se toca nada.
 - Prueba: `scripts/check-speech-numbers-lab46.js`, con la cadena completa y el dato grande.
 
 ## Lab.47 (Generador de offs)
