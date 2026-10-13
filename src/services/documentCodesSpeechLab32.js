@@ -53,7 +53,8 @@ const MARKER=String.raw`(?:N\s?\.?\s?[°º]\.?|Nro\.?|Núm\.?|Num\.|[Nn]úmero|[
 const MARKER_RX=new RegExp(String.raw`(?<![\p{L}\p{N}])${MARKER}\s*(${CODE_ANY})`,'gu');
 // "No." solo con un código con guion o barra ("No. 45-2024"), para no confundirlo con la negación.
 const NO_RX=new RegExp(String.raw`(?<![\p{L}\p{N}])No\.\s*(${CODE_SEP})`,'gu');
-const DOC=String.raw`(?:Decreto(?:\s+(?:Supremo|Legislativo|de\s+Urgencia|Regional|de\s+Alcald[ií]a|Ley))?|Resoluci[oó]n(?:\s+(?:de\s+)?\p{Lu}[\p{Ll}]+){0,4}|Ley(?:\s+Org[aá]nica)?|Proyecto\s+de\s+Ley|Expediente|Exp\.|Oficio(?:\s+M[uú]ltiple)?|Informe(?:\s+T[eé]cnico)?|Ordenanza(?:\s+Municipal|\s+Regional)?|Directiva|Casaci[oó]n|Acuerdo(?:\s+de\s+Concejo)?|Memorando|Carta|Sentencia|Acta|D\.\s?S\.|D\.\s?U\.|D\.\s?Leg\.|D\.\s?L\.|R\.\s?M\.|R\.\s?S\.|R\.\s?D\.|R\.\s?J\.|R\.\s?A\.)`;
+// Lab.46: también carpeta (fiscal), caso, denuncia y expediente, informe y acta en minúscula («la carpeta 17-2026»)
+const DOC=String.raw`(?:Decreto(?:\s+(?:Supremo|Legislativo|de\s+Urgencia|Regional|de\s+Alcald[ií]a|Ley))?|Resoluci[oó]n(?:\s+(?:de\s+)?\p{Lu}[\p{Ll}]+){0,4}|Ley(?:\s+Org[aá]nica)?|Proyecto\s+de\s+Ley|[Ee]xpediente|Exp\.|Oficio(?:\s+M[uú]ltiple)?|[Ii]nforme(?:\s+[Tt][eé]cnico)?|[Cc]arpeta(?:\s+[Ff]iscal)?|[Cc]aso|[Dd]enuncia|Ordenanza(?:\s+Municipal|\s+Regional)?|Directiva|Casaci[oó]n|Acuerdo(?:\s+de\s+Concejo)?|Memorando|Carta|Sentencia|[Aa]cta|D\.\s?S\.|D\.\s?U\.|D\.\s?Leg\.|D\.\s?L\.|R\.\s?M\.|R\.\s?S\.|R\.\s?D\.|R\.\s?J\.|R\.\s?A\.)`;
 const DOC_RX=new RegExp(String.raw`(?<![\p{L}\p{N}])(${DOC})\s+(${CODE_SEP})`,'gu');
 
 // Abreviaturas del tipo de documento que se dicen completas ("D.S. 004-2025-EF" → "Decreto Supremo cuatro, ...").
@@ -66,7 +67,8 @@ function speakDocumentCodes(input,dict=acr.BUILTIN){
   const marker=(_,code)=>{count++;return `número ${speakCode(code,dict)}`;};
   text=text.replace(ABBR_RX,doc=>docName(doc));
   text=text.replace(MARKER_RX,marker).replace(NO_RX,marker);
-  text=text.replace(DOC_RX,(_,doc,code)=>{count++;return `${docName(doc)} ${speakCode(code,dict)}`;});
+  // caso / denuncia / carpeta sin año en el código («ese caso 2-1») no son documentos: quedan igual
+  text=text.replace(DOC_RX,(m,doc,code)=>{if(/^(?:caso|denuncia|carpeta)$/i.test(doc)&&!/(?:^|\D)(?:19|20)\d{2}(?:\D|$)/.test(code))return m;count++;return `${docName(doc)} ${speakCode(code,dict)}`;});
   return{text,count};
 }
 

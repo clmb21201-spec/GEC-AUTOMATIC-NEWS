@@ -175,6 +175,47 @@ Ver `INTEGRACION_MERLIN.md`, sección "Modelo y animación". Opciones nuevas en 
 - Panel: botón «Optimización rápida» debajo de «Optimizar EC para esta computadora» y nota de la meta (`renderer-optimization-quick-lab44.js`): pide el modo rápido, hace clic en el botón normal y vuelve a `full` cuando el botón normal se reactiva.
 - Prueba: `scripts/check-optimization-quick-lab44.js` (con el `benchmarkQwenPerformance` real y un motor simulado).
 
+## Lab.45 (cifras con dinero y millones)
+
+- Síntoma: «Deuda de S/ 3.2 millones» se oía mal. La pronunciación básica (`normalizeCurrency` de `pronunciation.js`) la pasaba a «3.2 millones de soles» y el normalizador 0326 decía «tres coma dos». Además, «3.25» y «3.20» se leían como hora («tres horas con veinticinco minutos») y «18 000» como «dieciocho cero».
+- `services/moneySpeechLab45.js` (se instala al final de `bootstrap-v2lab.js`, envolviendo `PronunciationNormalizer.prototype.normalize`, por fuera de Lab.32): `speakMoney` pasa a palabras antes de todo lo demás.
+  - Con moneda delante (S/, S/., PEN, US$, USD, $, €, EUR) más cifra y escala opcional (mil, millón/millones, billón/billones, mil millones): «tres punto dos millones de soles», «un millón de soles», «veintiún millones», «mil quinientos soles», «tres soles con veinte céntimos», «un sol», «cincuenta céntimos».
+  - Cifra con decimales y escala, sin moneda: «tres punto dos millones de personas».
+  - Miles con espacio: «18 000» → «18000».
+  - Un separador seguido de exactamente 3 cifras es de miles; si no, es decimal. Con escala, el decimal se dice «punto»; sin escala y con 2 cifras, son céntimos (o centavos).
+  - La pantalla no cambia. El resultado trae `speechTransforms: 'cifras con dinero'` y `moneySpeechVersion`.
+- Prueba: `scripts/check-money-speech-lab45.js`, que recorre la cadena completa: Lab.45 → `basic` → estructural 0328 → normalizador 0326.
+
+## Lab.46 (horas con a. m. / p. m., fechas, ordinales, decimales, femeninos y entonación final)
+
+- Síntomas:
+  - «8:30 p.m. en Lima» se leía «ocho y treinta de la noche. en Lima»: el punto de «p.m.» cortaba la frase.
+  - «10 a.m.» quedaba como «diez a. m.» y «2:13 PM» como «… minutospe eme».
+  - «3.30 de la tarde» se leía «tres horas con treinta minutosde la tarde» y «13.10.2026» se tomaba como una hora.
+  - «1.º de mayo» salía «uno. º» y «1.200 personas» salía «mil doscientos personas».
+  - Los decimales con punto se leían con «coma».
+  - Cada titular de «Titulares de esta hora» se generaba sin punto final, y Qwen no cerraba la entonación de la última palabra.
+- `services/speechNumbersLab46.js`:
+  - `speakNumbers` va dentro del envoltorio de `PronunciationNormalizer.prototype.normalize`. Se instala antes que Lab.45 en `bootstrap-v2lab.js`, así que el dinero corre primero.
+  - Convierte:
+    - fechas dd.mm.aaaa, dd/mm/aaaa y dd-mm-aaaa;
+    - «12 m.» (mediodía);
+    - horas con a. m. / p. m. («ocho y treinta de la noche»; madrugada / mañana / mediodía / tarde / noche). Conserva el punto solo si la abreviatura cerraba la oración;
+    - hora seguida de «de la tarde» y similares;
+    - ordinales (º ª ° er ra…, con «primer» / «tercer» delante del sustantivo, sin tocar «°C»);
+    - «3 mil 200» → 3200;
+    - cifra + sustantivo femenino («mil doscientas personas», «tres mil doscientas computadoras», «veintiuna familias», «una persona», «trescientas mil personas», «un millón quinientas mil personas», «dos millones de personas»). Se reconoce por lista y por terminación (-as, -a, -ción, -sión, -dad, -tad, -tud, -umbre), menos excepciones masculinas (días, problemas, programas…), palabras de género común (turistas, atletas: masculino genérico) y palabras que no son sustantivos (para, hasta, cada…);
+    - miles con coma («3,200 autos» → 3200: una coma seguida de exactamente 3 cifras no es decimal);
+    - decimales con punto: 1–2 cifras → «punto», con «%» → «por ciento». Los decimales con coma siguen leyéndose «coma».
+  - `endWithPunctuation` envuelve `KokoroTTS.prototype.generate` (todas las voces, intervenciones, titulares y Merlín): si el texto no termina en . ! ? …, agrega un punto después de las comillas o paréntesis de cierre. Una coma o un punto y coma final pasan a punto.
+- `qwen_speed_lab31.py` `_trim`: al unir fragmentos deja 120 ms al final (antes 40), para no cortar la caída de la última palabra.
+- Lab.32 (`documentCodesSpeechLab32.js`, `DOC`) también reconoce carpeta, carpeta fiscal, caso y denuncia, y expediente, informe y acta en minúscula: «la carpeta 17-2026» → «carpeta diecisiete, dos mil veintiséis». Caso, denuncia y carpeta exigen un año en el código, para no tocar «ese caso 2-1».
+- Dato grande de Noticias con movimiento (`newsMotionLab37.js`):
+  - `NUM` acepta «3 mil 200», que se muestra «3 200».
+  - `RE_QTY_ANY` toma una cifra con cualquier sustantivo (3 200 turistas, 3.200 computadoras). No toma años sueltos, cifras de un dígito, «años» u «horas», meses ni palabras que no son sustantivos.
+  - En cada oración, la cifra gana a la fecha, la persona o el lugar.
+- Prueba: `scripts/check-speech-numbers-lab46.js`, con la cadena completa y el dato grande.
+
 ## Pendiente
 
 - Integrar en modo Merlín el envío por NDI (hoy NDI queda bloqueado con aviso en modo Merlín).

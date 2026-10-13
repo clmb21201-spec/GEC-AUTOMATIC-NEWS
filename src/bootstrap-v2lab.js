@@ -64,4 +64,7 @@ if(!gotLock){app.quit();}else{
   require('./services/dataLocationLab42').installDataLocationLab42();
   require('./services/profileExtrasLab43').installProfileExtrasLab43();
   require('./services/optimizationQuickLab44').installOptimizationQuickLab44();
+  // Lab.46 antes que Lab.45: el último instalado corre primero, y el dinero («S/ 3.2 millones») va antes que los decimales
+  require('./services/speechNumbersLab46').installSpeechNumbersLab46();
+  require('./services/moneySpeechLab45').installMoneySpeechLab45();
 }
