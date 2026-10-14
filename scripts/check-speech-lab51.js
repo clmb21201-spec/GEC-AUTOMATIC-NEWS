@@ -40,9 +40,9 @@ const cases=[
   ['El celular 987654321 de contacto.','El celular nueve ocho siete, seis cinco cuatro, tres dos uno de contacto.'],
   ['Llame al 01 311 5930.','Llame al cero uno, tres uno uno, cinco nueve tres cero.'],
   ['DNI 45678912.','de ene i cuatro cinco seis siete ocho nueve uno dos.'],
-  // tipo de cambio con 3 decimales: antes «tres mil setecientos cuarenta y cinco soles»
-  ['El tipo de cambio cerró en S/ 3.745 por dólar.','El tipo de cambio cerró en tres punto siete cuatro cinco soles por dólar.'],
-  ['El dólar cerró en S/ 3,745.','El dólar cerró en tres punto siete cuatro cinco soles.'],
+  // tipo de cambio: se dice como cifra de miles, tal cual (pedido del operador)
+  ['El tipo de cambio cerró en S/ 3.745 por dólar.','El tipo de cambio cerró en tres mil setecientos cuarenta y cinco soles por dólar.'],
+  ['El dólar cerró en S/ 3,745.','El dólar cerró en tres mil setecientos cuarenta y cinco soles.'],
   ['Pagó S/ 3.745 en multas.','Pagó tres mil setecientos cuarenta y cinco soles en multas.'],
   // tecnología: antes «cinco gramos»
   ['La red 5G y el 4G.','La red cinco ge y el cuatro ge.'],
@@ -54,11 +54,12 @@ const cases=[
   ['Entre 100-200 soles.','Entre cien y doscientos soles.'],
   ['N° 000081-2026-PE-ONP','número ochenta y uno, dos mil veintiséis, pe e, o ene pe'],
   ['El 13-10-2026 se votó.','El trece de octubre de dos mil veintiséis se votó.'],
-  // decimales con coma y estatura
-  ['El PBI creció 3,2 % en el trimestre.','El pe be i creció tres punto dos por ciento en el trimestre.'],
-  ['Sismo de magnitud 5,8.','Sismo de magnitud cinco punto ocho.'],
-  ['Mide 1,75 m y pesa 80 kg.','Mide un metro setenta y cinco y pesa ochenta kilogramos.'],
-  ['Mide 1.80 metros.','Mide un metro ochenta.'],
+  // decimales y estatura: tal cual lo escrito (coma → «coma», punto → «punto»)
+  ['El PBI creció 3,2 % en el trimestre.','El pe be i creció tres coma dos por ciento en el trimestre.'],
+  ['El PBI creció 3.2 % en el trimestre.','El pe be i creció tres punto dos por ciento en el trimestre.'],
+  ['Sismo de magnitud 5,8.','Sismo de magnitud cinco coma ocho.'],
+  ['Mide 1,75 m y pesa 80 kg.','Mide uno coma setenta y cinco metros y pesa ochenta kilogramos.'],
+  ['Mide 1.80 metros.','Mide uno punto ochenta metros.'],
   ['La lista 1, 2 y 3.','La lista uno, dos y tres.'],
   ['Robo de 18 000 soles','Robo de dieciocho mil soles'],
 ];
@@ -84,5 +85,5 @@ eq(B.lumaFromBitmap(null,0,0),null,'sin imagen: null');
   const rd=fs.readFileSync(path.join(src,'renderer-news-motion-lab37.js'),'utf8');ok(/Fondo detrás del texto/.test(rd)&&/next\.backdrop/.test(rd)&&/gecNmBdLevel/.test(rd),'panel: automático / manual y ajuste');
   const boot=fs.readFileSync(path.join(src,'bootstrap-v2lab.js'),'utf8');ok(/backdropLumaLab51'\)\.installBackdropLumaLab51\(\)/.test(boot),'bootstrap instala la medición');
   const n46=fs.readFileSync(path.join(svc,'speechNumbersLab46.js'),'utf8');ok(/speechFixesLab51/.test(n46),'Lab.46 usa las correcciones de Lab.51');
-  console.log(`check-speech-lab51 OK (${checks} verificaciones) · masculinos · abreviaturas · teléfonos · horas · códigos · tipo de cambio · fondo`);
+  console.log(`check-speech-lab51 OK (${checks} verificaciones) · masculinos · abreviaturas · teléfonos · horas · códigos · fondo`);
 })().catch(e=>{console.error('check-speech-lab51: '+(e.stack||e.message));process.exit(1);});

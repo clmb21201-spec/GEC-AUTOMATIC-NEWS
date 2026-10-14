@@ -104,15 +104,13 @@ function speakNumbers(input){
   });
   // 4c) miles con coma (3,200 autos): una coma seguida de exactamente 3 cifras no es decimal
   s=s.replace(/(?<![\d.,])(\d{1,3})((?:,\d{3})+)(?![\d]|[.,]\d)/g,(m,a,rest)=>hit(a+rest.replace(/,/g,'')));
-  // Lab.51: «71 años» → «setenta y un años»; estatura «1,75 m» → «un metro setenta y cinco»
-  step(F51.masculineApocope);step(F51.speakHeight);
+  // Lab.51: «71 años» → «setenta y un años»
+  step(F51.masculineApocope);
   // 5) decimales con punto (1 o 2 cifras después del punto; 3 cifras = miles): 3.5% → tres punto cinco por ciento
   s=s.replace(new RegExp(`(?<![\\p{L}\\p{N}.,/:])(\\d+)\\.(\\d{1,2})(?![\\d]|\\.\\d|:\\d)(\\s?%)?`,'gu'),(m,a,b,pct)=>{
     const dec=/^0/.test(b)?b.split('').map(words).join(' '):words(b);
     return hit(`${words(a)} punto ${dec}${pct?' por ciento':''}`);
   });
-  // Lab.51: decimales con coma, igual que con punto («3,2 %» → «tres punto dos por ciento»)
-  step(F51.commaDecimals);
   // 6) Lab.50 · romano delante de un sustantivo: «el III Simulacro» → «el tercer Simulacro», «la IV edición» → «la cuarta
   // edición», «los XV Juegos» → «los decimoquintos Juegos». Solo después de un artículo o determinante, o al empezar la
   // oración (I, V y X sueltas, solo después de un determinante). Lo de siempre («León XIV», «siglo XXI») no se toca.

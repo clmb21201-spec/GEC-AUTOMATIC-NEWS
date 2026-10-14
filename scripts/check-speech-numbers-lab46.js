@@ -32,13 +32,12 @@ const cases=[
   ['21 familias damnificadas y 1 persona fallecida','veintiuna familias damnificadas y una persona fallecida'],
   ['500 viviendas y 300 escuelas','quinientas viviendas y trescientas escuelas'],
   ['Duró 2 horas','Duró dos horas'],
-  // decimales con punto → «punto»; con coma también «punto» desde Lab.51 (antes «coma»)
+  // decimales con punto → «punto»; con coma → «coma» (se dice tal cual lo escrito)
   ['La inflación subió 3.5% en septiembre.','La inflación subió tres punto cinco por ciento en septiembre.'],
   ['un sismo de magnitud 5.8','un sismo de magnitud cinco punto ocho'],
-  // Lab.51: estatura como se dice en noticias (antes «uno punto setenta y cinco metros»)
-  ['mide 1.75 metros','mide un metro setenta y cinco'],
+  ['mide 1.75 metros','mide uno punto setenta y cinco metros'],
   ['un aumento de 0.8 puntos','un aumento de cero punto ocho puntos'],
-  ['el 50,3 % de votos','el cincuenta punto tres por ciento de votos'],
+  ['el 50,3 % de votos','el cincuenta coma tres por ciento de votos'],
   // lo que ya estaba bien sigue igual
   ['Deuda de S/ 3.2 millones afecta educación en Piura','Deuda de tres punto dos millones de soles afecta educación en Piura'],
   ['Se registraron 12 500 casos.','Se registraron doce mil quinientos casos.'],

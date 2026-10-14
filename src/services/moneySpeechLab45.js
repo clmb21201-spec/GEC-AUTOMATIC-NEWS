@@ -76,12 +76,8 @@ function speakMoney(input){
   // 3'244,426.50 → 3244426.50. Vale con ' ’ ´ y sin moneda («3'244,426 personas»); el apóstrofo de palabras no se toca.
   text=text.replace(/(?<![\d.,'’´])(\d{1,3})['’´](\d{3})((?:[.,\u00a0 ]\d{3})*)(?:([.,])(\d{1,2}))?(?![\d]|[.,'’´]\d)/g,(m,a,b,rest,_sep,dec)=>{count++;return a+b+rest.replace(/[.,\u00a0 ]/g,'')+(dec?'.'+dec:'');});
   // 1) con moneda delante (S/ 3.2 millones, US$ 2.5 millones, S/ 1.500, S/ 3.20)
-  text=text.replace(new RegExp(`${CUR_RX}\\s?${NUM_RX}(?:\\s+${SCALE_RX}${E})?(?:\\s+de\\s+(?:soles|d[oó]lares|euros)${E})?`,'giu'),(m,cur,num,scale,offset,full)=>{
+  text=text.replace(new RegExp(`${CUR_RX}\\s?${NUM_RX}(?:\\s+${SCALE_RX}${E})?(?:\\s+de\\s+(?:soles|d[oó]lares|euros)${E})?`,'giu'),(m,cur,num,scale)=>{
     if(cur==='$'&&/^\d{4}$/.test(num))return m;
-    // Lab.51 · tipo de cambio con 3 decimales: «S/ 3.745 por dólar» → «tres punto siete cuatro cinco soles» (antes «tres mil…»)
-    if(!scale&&/^\d[.,]\d{3}$/.test(num)&&/d[oó]lar|tipo de cambio|cotiz|divisa|casas? de cambio|\beuro/i.test(full.slice(Math.max(0,offset-90),offset+m.length+40))){
-      const c=CURRENCY[curCode(cur)];count++;return`${intWords(num[0])} punto ${num.slice(2).split('').map(d=>intWords(d)).join(' ')} ${c.many}`;
-    }
     const w=moneyWords(cur,num,scale);if(!w)return m;count++;return w;
   });
   // 2) cifra con decimales + escala, sin moneda delante (3.2 millones de soles, 15.4 mil millones, 3,25 millones de personas)

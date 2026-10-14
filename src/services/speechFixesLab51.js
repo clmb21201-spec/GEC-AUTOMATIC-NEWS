@@ -8,10 +8,10 @@
 //   - hora con «las» delante: «a las 20:00» → «a las veinte horas» (en notas de deportes se tomaba como marcador);
 //   - códigos con guion: «2026-001» → «dos mil veintiséis, uno» (antes «dos mil veintiséis menos uno»); años
 //     «2021-2026» → «dos mil veintiuno a dos mil veintiséis». Los códigos de documentos siguen en Lab.32;
-//   - estatura: «1,75 m» → «un metro setenta y cinco»;
 //   - «uno» delante de un sustantivo masculino: «71 años» → «setenta y un años», «21 heridos» → «veintiún heridos»,
 //     «1 muerto» → «un muerto» (antes «setenta y uno años»);
-//   - decimales con coma: «3,2 %» → «tres punto dos por ciento», igual que con punto.
+//   Los decimales se dicen como están escritos: «3,2 %» → «tres coma dos», «3.2 %» → «tres punto dos» (speakHeight y
+//   commaDecimals quedan exportadas pero no se usan: el operador pidió leer tal cual lo escrito).
 const {integerWords}=require('./speechRules0328');
 
 const VERSION='lab51-speech-1';
