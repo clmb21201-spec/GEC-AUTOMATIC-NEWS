@@ -211,7 +211,7 @@ Ver `INTEGRACION_MERLIN.md`, sección "Modelo y animación". Opciones nuevas en 
     - decimales con punto: 1–2 cifras → «punto», con «%» → «por ciento». Los decimales con coma siguen leyéndose «coma».
   - `endWithPunctuation` envuelve `KokoroTTS.prototype.generate` (todas las voces, intervenciones, titulares y Merlín): si el texto no termina en . ! ? …, agrega un punto después de las comillas o paréntesis de cierre. Una coma o un punto y coma final pasan a punto.
 - `qwen_speed_lab31.py` `_trim`: al unir fragmentos deja 120 ms al final (antes 40), para no cortar la caída de la última palabra.
-- Frases de las intervenciones en caché (`presenter-voice/`, `fileFor` en `main.js`): la clave lleva `VOICE_CACHE_REV` (`'lab51'` desde Lab.51). Así las frases generadas con versiones anteriores de la voz se vuelven a generar una vez. Hay que subir la revisión cuando cambie la cadena de la voz.
+- Frases de las intervenciones en caché (`presenter-voice/`, `fileFor` en `main.js`): la clave lleva `VOICE_CACHE_REV` (`'lab52'` desde Lab.52). Así las frases generadas con versiones anteriores de la voz se vuelven a generar una vez. Hay que subir la revisión cuando cambie la cadena de la voz.
 - Lab.32 (`documentCodesSpeechLab32.js`, `DOC`) también reconoce carpeta, carpeta fiscal, caso y denuncia, y expediente, informe y acta en minúscula: «la carpeta 17-2026» → «carpeta diecisiete, dos mil veintiséis». Caso, denuncia y carpeta exigen un año en el código, para no tocar «ese caso 2-1».
 - Dato grande de Noticias con movimiento (`newsMotionLab37.js`):
   - `NUM` acepta «3 mil 200», que se muestra «3 200».
@@ -276,6 +276,16 @@ Ver `INTEGRACION_MERLIN.md`, sección "Modelo y animación". Opciones nuevas en 
   - Salida (bloque al final de `output-news-motion-lab37.js|css`, así vale para `output.html`, `output-web.html` y la vista previa): mide la luminancia de la foto (mitad izquierda para el recuadro, toda para el dato, tercio inferior para foto completa y detalle) y fija `--nm-bright` (brillo de la foto desenfocada) y `--nm-extra` (sombra extra abajo). Primero intenta con canvas; si la foto es de otro sitio (CORS) la pide al proceso principal: IPC `output:imageLuma` (`services/backdropLumaLab51.js`, `nativeImage`, 4 s, 15 MB, caché de 200). Sin medición, valor seguro. En manual, `level` es la oscuridad; en automático, corre lo calculado hacia más claro (<50) o más oscuro (>50). Sombra suave detrás del texto.
   - Panel: sección «Fondo detrás del texto» en la ventana «Colores, ticker y sonidos…» (automático / manual y control), con la vista previa al instante.
 - Prueba: `scripts/check-speech-lab51.js`.
+
+## Lab.52 (entonación de las intervenciones e indicador de tiempo de los offs)
+
+- Síntoma: «No te vayas, regresamos enseguida.» sonaba «sin punto». En el audio, la última sílaba subía de ~200 a ~370 Hz y solo quedaban 0,13 s después de la voz. El texto sí terminaba en punto: Qwen a veces entona así las frases cortas con coma, y con la semilla de producción fija la misma frase sale siempre igual.
+- `services/hostVoiceLab52.js` (se instala al final de `bootstrap-v2lab.js`; `presenterHost` lo usa con `hostGenerate` en `ensureClips` y `speakToFile`, Merlín y vista clásica):
+  - Mejor toma: `endingScore` mide el tono de la última sílaba sobre el de la frase (autocorrelación a 8 kHz, < 1 baja, > 1 sube). Cada frase fija se genera hasta 3 veces: la 1.ª con la semilla de siempre y las otras con otra semilla solo para esa llamada (`AsyncLocalStorage` + envoltorio de `TTSLabRuntime.prototype.generate` que cambia `productionSeed`; las noticias no se tocan). Se queda la de menor puntaje y para en cuanto una baja (≤ 1,03). Kokoro y las frases con `{hora}` (12 s de espera): una sola toma. Queda en el registro (`PRESENTER_TTS`).
+  - Respiro: `padSilence` agrega 0,45 s de silencio al final del WAV antes de que entre el contenido o el anuncio.
+  - Caché: `ensureClips` marca (fecha) las frases que siguen en uso y una vez por arranque borra de `presenter-voice/` los audios de 16 hex sin usar hace 14 días (versiones anteriores). `titulares-*.wav` no se toca. `VOICE_CACHE_REV` pasa a `'lab52'`.
+- Generador de offs: `offs:generate` manda `doneChars`, `totalChars`, `paraChars` y `rtf` (velocidad medida de la voz, `offs:status` también la trae). El panel muestra barra por cantidad de texto, tiempo transcurrido, restante (con la velocidad real de los párrafos hechos; antes del primero, con la de la optimización) y «⚠ Este párrafo está tardando más de lo normal…» si pasa de 3 veces lo esperado (mínimo 25 s). En el paso ② suma «se genera en ~X».
+- Prueba: `scripts/check-host-voice-lab52.js`.
 
 ## Pendiente
 

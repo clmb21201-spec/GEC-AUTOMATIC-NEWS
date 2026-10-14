@@ -77,6 +77,9 @@ const STEPS=[
   ['--check','src/services/speechFixesLab51.js'],
   ['--check','src/services/backdropLumaLab51.js'],
   ['scripts/check-speech-lab51.js'],
+  // Lab.52 · voz de las intervenciones (mejor toma, respiro, caché) e indicador de tiempo del Generador de offs
+  ['--check','src/services/hostVoiceLab52.js'],
+  ['scripts/check-host-voice-lab52.js'],
 ];
 // Python: el mismo "python" que usa package.json (en Linux puede llamarse python3)
 function runPython(args){

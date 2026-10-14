@@ -115,6 +115,8 @@
   }
   function msg(text, warn){ const m = $('#gecOffMsg'); if (m) { m.textContent = text || ''; m.className = 'gec-off-meta' + (warn ? ' warn' : ''); } }
   function target(){ return SECS[cur?.mode] || 0; }
+  // Lab.52: cuánto tarda en generarse (con la velocidad medida de la voz en esta computadora)
+  function genLine(t){ const r = Number(st.rtf) || 0, e = est(t); return r > 0 && e > 0 ? ` · se genera en ~${fmt(Math.max(5, Math.round(e * r * 1.1)))}` : ''; }
   function estLine(t){ const e = est(t), tg = target(); return tg ? `~${fmt(e)} leído · objetivo ${fmt(tg)}${e > tg * 1.15 ? ' · está largo, recórtalo un poco' : ''}` : `~${fmt(e)} leído`; }
   function render(){
     const el = $('#gecOffStep'); if (!el) return;
@@ -131,7 +133,7 @@
       el.innerHTML = `<p class="note">Así lo va a leer la voz. Lo resaltado es lo que GEC convirtió (cifras, horas, siglas, documentos…). Corrige lo que quieras: se narra exactamente lo que quede abajo.</p>
         <div class="gec-off-diff" id="gecOffDiff">${diffHtml(prepared?.written || [], (cur.spoken ?? prepared?.text ?? '').split(/\n\s*\n/))}</div>
         <textarea id="gecOffSpoken">${esc(cur.spoken ?? prepared?.text ?? '')}</textarea>
-        <div class="gec-off-meta" id="gecOffEst2">${esc(estLine(cur.spoken ?? prepared?.text))}</div>
+        <div class="gec-off-meta" id="gecOffEst2">${esc(estLine(cur.spoken ?? prepared?.text) + genLine(cur.spoken ?? prepared?.text))}</div>
         <div class="gec-off-acr"><span class="gec-off-meta">¿Una sigla que se lee mal siempre? Guárdala en «Siglas» (vale también para las noticias):</span><input id="gecOffAcrA" placeholder="Sigla (BTS)"><input id="gecOffAcrB" placeholder="Se dice (bi ti es)"><button type="button" class="dark compact" id="gecOffAcrSave">Guardar sigla</button></div>
         <div class="gec-off-row"><button type="button" class="dark" id="gecOffBack1">Volver al texto</button><button type="button" id="gecOffGen">Generar audio</button></div>`;
     } else {
@@ -196,7 +198,7 @@
     if (!spoken.trim()) { msg('No hay texto para narrar.', true); return; }
     busyUi(true, 'Generando el audio con tu voz…');
     const r = await api.offsGenerate({spoken, written: cur.edited ?? cur.text});
-    busyUi(false, '');
+    genStop(); busyUi(false, '');
     if (!r || r.ok === false) { msg(r?.error || 'No se pudo generar el audio.', true); return; }
     audio = r; msg(''); setStep(3);
   }
@@ -231,7 +233,7 @@
   }
   function onInput(e){
     if (e.target.id === 'gecOffText') { const m = $('#gecOffEst'); if (m) m.textContent = estLine(e.target.value); }
-    if (e.target.id === 'gecOffSpoken') { const m = $('#gecOffEst2'); if (m) m.textContent = estLine(e.target.value); }
+    if (e.target.id === 'gecOffSpoken') { const m = $('#gecOffEst2'); if (m) m.textContent = estLine(e.target.value) + genLine(e.target.value); }
   }
   function onChange(e){
     const t = e.target;
@@ -242,11 +244,38 @@
     if (!p) return;
     if (p.blocked !== undefined) applyStatus({blocked: p.blocked, reason: p.reason, busy: p.busy});
     const bar = $('#gecOffBar b');
+    if (p.stage === 'generate' && p.totalChars) { genTrack(p); return; }
+    if (p.stage !== 'generate') genStop();
     if (bar && p.total) bar.style.width = `${Math.round(p.index / p.total * 100)}%`;
     if (p.stage === 'generate' && p.total) msg(`Generando el audio con tu voz… párrafo ${p.index} de ${p.total}`);
     if (p.stage === 'prepare' && p.total) msg(`Preparando cómo lo leerá la voz… párrafo ${p.index} de ${p.total}`);
     if (p.stage === 'mix') msg('Uniendo párrafos y dejando el volumen parejo…');
   });
+
+  // Lab.52 · avance de la generación: barra por cantidad de texto, tiempo transcurrido y restante (con la velocidad real
+  // de los párrafos ya hechos; antes del primero, con la medida en la optimización) y aviso si un párrafo se demora.
+  let gen = null, genTimer = 0;
+  const CPS = 14; // caracteres por segundo de locución
+  function genTrack(p){
+    const now = Date.now();
+    if (!gen || p.index === 1 && p.doneChars === 0) gen = {start: now};
+    if (gen.index !== p.index) { gen.paraStart = now; gen.slow = false; }
+    Object.assign(gen, {index: p.index, total: p.total, done: p.doneChars, all: p.totalChars, para: p.paraChars, rtf: Number(p.rtf) || Number(st.rtf) || 1});
+    if (!genTimer) genTimer = setInterval(genPaint, 500);
+    genPaint();
+  }
+  function genStop(){ clearInterval(genTimer); genTimer = 0; gen = null; }
+  function genPaint(){
+    if (!gen) return;
+    const now = Date.now(), el = (now - gen.start) / 1000, pe = (now - gen.paraStart) / 1000;
+    // segundos de cálculo por carácter: real si ya hay párrafos hechos; si no, el de la optimización
+    const spc = gen.done > 0 ? ((gen.paraStart - gen.start) / 1000) / gen.done : gen.rtf / CPS;
+    const paraExp = Math.max(3, gen.para * spc), inPara = Math.min(gen.para * .97, pe / spc);
+    const left = Math.max(1, (gen.all - gen.done) * spc - pe);
+    const bar = $('#gecOffBar b'); if (bar) bar.style.width = `${Math.min(99, Math.round((gen.done + inPara) / gen.all * 100))}%`;
+    const slow = pe > Math.max(25, paraExp * 3);
+    msg(`Generando el audio con tu voz… párrafo ${gen.index} de ${gen.total} · ${fmt(Math.round(el))} transcurrido · ${pe > paraExp * 1.5 ? 'calculando…' : `faltan ~${fmt(Math.round(left))}`}${slow ? ' · ⚠ Este párrafo está tardando más de lo normal; si no avanza en un rato, puedes cancelar.' : ''}`, slow);
+  }
 
   const tryMount = () => { if (mount()) { refresh(); renderDocs(); render(); return true; } return false; };
   if (!tryMount()) { const mo = new MutationObserver(() => { if (tryMount()) mo.disconnect(); }); mo.observe(document.documentElement, {childList: true, subtree: true}); }
