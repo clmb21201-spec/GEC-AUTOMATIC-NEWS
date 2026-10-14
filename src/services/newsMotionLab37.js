@@ -79,7 +79,8 @@ function alignSentences(sentences,segments,durationSec,spoken=''){
 
 // ---------------------------------------------------------------- datos clave (sin IA)
 // Lab.46: también «3 mil 200» (una sola cifra)
-const NUM='\\d{1,3}\\smil\\s\\d{1,3}(?![\\d.,])|\\d{1,3}(?:[.\\s]\\d{3})+(?:,\\d+)?|\\d+(?:[.,]\\d+)?';
+// Lab.50: primero los millones con apóstrofo (3'244,426) y los miles con varias comas (3,200,000); antes se cortaban en «3» y «3,200»
+const NUM='\\d{1,3}[\'’´]\\d{3}(?:[.,\\s]\\d{3})*(?:[.,]\\d{1,2})?(?![\\d])|\\d{1,3}(?:,\\d{3}){2,}(?:\\.\\d{1,2})?(?![\\d])|\\d{1,3}\\smil\\s\\d{1,3}(?![\\d.,])|\\d{1,3}(?:[.\\s]\\d{3})+(?:,\\d+)?|\\d+(?:[.,]\\d+)?';
 const SCALE='(?:\\s(?:mil\\s)?(?:millones|millón|mil|billones))?';
 const RE_MONEY=new RegExp(`(?:S\\/\\.?|US\\$|\\$|€|£)\\s?(?:${NUM})${SCALE}`,'g');
 const RE_PCT=new RegExp(`(?:${NUM})\\s?(?:%|por\\s?ciento)`,'gi');
@@ -124,7 +125,7 @@ function factsInSentence(s){
   each(RE_PCT,m=>add({type:'cifra',big:tidy(m[0]),label:labelAround(s,m.index,m[0].length),cifra:true},m.index,m[0].length));
   if(SPORT.test(s))each(RE_SCORE,m=>add({type:'marcador',big:tidy(m[0]).replace(/\s/g,''),label:labelAround(s,m.index,m[0].length),cifra:true},m.index,m[0].length));
   each(RE_QTY,m=>add({type:'cifra',big:tidy(m[0]),label:labelAround(s,m.index,m[0].length),cifra:true},m.index,m[0].length));
-  each(RE_QTY_ANY,m=>{const num=m[0].match(/^[\d.,\s]+(?:mil\s\d+)?/)[0].trim();if(QTY_STOP.test(m[0])||/^(?:19|20)\d{2}$/.test(num)||/^\d$/.test(num))return;add({type:'cifra',big:tidy(m[0]),label:labelAround(s,m.index,m[0].length),cifra:true},m.index,m[0].length);});
+  each(RE_QTY_ANY,m=>{const num=m[0].match(/^[\d.,\s'’´]+(?:mil\s\d+)?/)[0].trim();if(QTY_STOP.test(m[0])||/^(?:19|20)\d{2}$/.test(num)||/^\d$/.test(num))return;add({type:'cifra',big:tidy(m[0]),label:labelAround(s,m.index,m[0].length),cifra:true},m.index,m[0].length);});
   each(RE_ROLE_NAME,m=>{const i=m.index+m[0].lastIndexOf(m[2]);add({type:'persona',big:m[2],label:cap(m[1])},i,m[2].length);});
   each(RE_NAME_ROLE,m=>add({type:'persona',big:m[1],label:cap(m[2])},m.index,m[1].length));
   each(RE_ACR,m=>{const i=m.index+m[0].lastIndexOf(m[2]);add({type:'institucion',big:m[2],label:m[1]},i,m[2].length);});

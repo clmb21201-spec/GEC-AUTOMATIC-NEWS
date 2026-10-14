@@ -250,6 +250,16 @@ Ver `INTEGRACION_MERLIN.md`, sección "Modelo y animación". Opciones nuevas en 
 - `services/optimizationIdentityLab49.js` (se instala al final de `bootstrap-v2lab.js`, envolviendo `SettingsStore.prototype.load` por fuera de todo): si a la optimización le falta el modelo y su motor, clave y firma del runtime (que incluye modelo y huella; sin la voz de referencia) coinciden con la voz actual, se completa con el modelo actual. Otro modelo, otra huella o un fine-tuned sin firma no se tocan.
 - Prueba: `scripts/check-optimization-identity-lab49.js`.
 
+## Lab.50 (millones con apóstrofo, romanos delante de un sustantivo y apellidos con tilde)
+
+- Millones con apóstrofo, al estilo peruano («S/ 3'244,426», con ' ’ o ´):
+  - Voz: antes «tres soles» y un número suelto. `speakMoney` (Lab.45), paso 0: la cifra pasa a dígitos (3244426; con decimales, 3244426.50) antes de las demás reglas. Vale sin moneda («3'244,426 personas» → femenino de Lab.46). El apóstrofo de palabras («O'Higgins») no se toca.
+  - Millones exactos llevan «de»: «S/ 1'000,000» → «un millón de soles» (antes «un millón soles»).
+  - Dato grande (`newsMotionLab37.js`, `NUM`): antes «S/ 3»; ahora la cifra completa, como viene en el guion. Lo mismo con varias comas de miles («S/ 3,200,000», antes «S/ 3,200»).
+- Romanos delante de un sustantivo (`speakNumbers` de Lab.46, paso 6): «el III Simulacro» → «el tercer Simulacro», «la IV edición» → «la cuarta edición», «los XV Juegos» → «los decimoquintos Juegos», «la XXI Bienal» → «la veintiuna Bienal». Solo después de un artículo o determinante, o al empezar la oración o una línea; I, V y X sueltas, solo después de un determinante. Género y número del artículo («la II Guerra»); si no hay, del sustantivo. Hasta 20 en una palabra (undécimo, decimocuarto…), desde 21 cardinal. Lo que ya estaba bien no cambia («León XIV», «siglo XXI», «Juan Pablo II»).
+- Apellidos y palabras con tilde que empiezan con una letra romana, después de otra palabra con mayúscula: «José Cárdenas» se leía «José cienárdenas», «Rosa Vásquez» «Rosa quintoásquez», «Atención Médica» «Atención milédica». Las reglas de romanos de `speechRules0328.js` y `speechNormalizer0326.js` terminaban en `\b`, que en JavaScript no cuenta las vocales con tilde como letras; ahora terminan en `(?![A-Za-z\u00C0-\u024F0-9])` (punto acotado en los dos archivos).
+- Prueba: `scripts/check-speech-lab50.js`, con la cadena completa y el dato grande.
+
 ## Pendiente
 
 - Integrar en modo Merlín el envío por NDI (hoy NDI queda bloqueado con aviso en modo Merlín).

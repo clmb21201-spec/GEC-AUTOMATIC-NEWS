@@ -64,12 +64,17 @@ function moneyWords(cur,raw,scale){
     return`${apocope(intWords(p.int))} ${one?c.one:c.many} con ${apocope(intWords(String(cn)))} ${cn===1?c.cent1:c.cents}`;
   }
   if(p.dec)return`${intWords(p.int)} punto ${decimalWords(p.dec)} ${c.many}`;
-  return`${apocope(intWords(p.int))} ${one?c.one:c.many}`;
+  // Lab.50: millones exactos llevan «de» («un millón de soles», «tres millones de dólares»)
+  const w=apocope(intWords(p.int));
+  return`${w}${/mill(?:ón|ones)$/.test(w)?' de':''} ${one?c.one:c.many}`;
 }
 
 function speakMoney(input){
   let text=String(input??''),count=0;
   const B='(?<![\\p{L}\\p{N}])',E='(?![\\p{L}\\p{N}])';
+  // 0) Lab.50 · millones con apóstrofo, al estilo peruano: S/ 3'244,426 → S/ 3244426 (antes «tres soles» y un número suelto);
+  // 3'244,426.50 → 3244426.50. Vale con ' ’ ´ y sin moneda («3'244,426 personas»); el apóstrofo de palabras no se toca.
+  text=text.replace(/(?<![\d.,'’´])(\d{1,3})['’´](\d{3})((?:[.,\u00a0 ]\d{3})*)(?:([.,])(\d{1,2}))?(?![\d]|[.,'’´]\d)/g,(m,a,b,rest,_sep,dec)=>{count++;return a+b+rest.replace(/[.,\u00a0 ]/g,'')+(dec?'.'+dec:'');});
   // 1) con moneda delante (S/ 3.2 millones, US$ 2.5 millones, S/ 1.500, S/ 3.20)
   text=text.replace(new RegExp(`${CUR_RX}\\s?${NUM_RX}(?:\\s+${SCALE_RX}${E})?(?:\\s+de\\s+(?:soles|d[oó]lares|euros)${E})?`,'giu'),(m,cur,num,scale)=>{
     if(cur==='$'&&/^\d{4}$/.test(num))return m;
