@@ -132,3 +132,7 @@
 #stage[data-format="9:16"] #nmLayer .nm-wipe i{width:760px}#stage[data-format="9:16"] #nmLayer .nm-wipe i:nth-child(2){width:970px}
 #stage[data-format="9:16"] #nmSting i{width:1190px}
 #stage[data-format="9:16"] #nmSting .nx{font-size:40px;letter-spacing:.2em}
+/* Lab.51 · fondo detrás del texto: brillo de la foto desenfocada y sombra extra según lo clara que sea la foto */
+#nmLayer .nm-blur{filter:blur(42px) brightness(var(--nm-bright,.5)) saturate(1.1);transition:filter .4s}
+#nmLayer .nm-full .nm-shade::after,#nmLayer .nm-zoom .nm-shade2::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 30%,rgba(0,0,0,var(--nm-extra,0)) 75%);transition:opacity .4s}
+#nmLayer .nm-side .nm-col,#nmLayer .nm-hero,#nmLayer .nm-full .nm-l3{text-shadow:0 2px 14px rgba(0,0,0,.45)}

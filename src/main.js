@@ -335,7 +335,7 @@ const presenterHost=(()=>{
   function cacheDir(){try{return path.join(dataDir||portableDataDir(),'presenter-voice');}catch{return path.join(app.getPath('userData'),'presenter-voice');}}
   function voiceKey(){const s=settingsStore?.load?.()||{};return JSON.stringify({voice:s.tts?.voice||'',speed:s.tts?.speed||1,engine:s.tts?.engine||s.tts?.primaryEngine||''});}
   // VOICE_CACHE_REV: al cambiar la cadena de la voz (Lab.41 murmullos, Lab.46 final de la última palabra) las frases se vuelven a generar una vez
-const VOICE_CACHE_REV='lab46';function fileFor(text){return path.join(cacheDir(),crypto.createHash('sha1').update(voiceKey()+'|'+VOICE_CACHE_REV+'|'+text).digest('hex').slice(0,16)+'.wav');}
+const VOICE_CACHE_REV='lab51';function fileFor(text){return path.join(cacheDir(),crypto.createHash('sha1').update(voiceKey()+'|'+VOICE_CACHE_REV+'|'+text).digest('hex').slice(0,16)+'.wav');}
   const ready=f=>{try{return fs.statSync(f).size>1000;}catch{return false;}};
   // Merlín solo habla si la salida muestra de verdad su página: si WebGL o el modelo fallan, la salida vuelve a output.html
   // aunque el modo siga en 'merlin', y la clásica trataba la intervención como una noticia vacía (y su 'ended' como el de la noticia).

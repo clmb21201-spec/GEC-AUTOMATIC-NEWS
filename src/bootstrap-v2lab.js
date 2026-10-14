@@ -70,4 +70,6 @@ if(!gotLock){app.quit();}else{
   require('./services/offsLab47').installOffsLab47();
   // Lab.49: al cargar, la optimización del fine-tuned recupera su modelo (la copia por perfil lo perdía)
   require('./services/optimizationIdentityLab49').installOptimizationIdentityLab49();
+  // Lab.51: qué tan clara es la foto de cada nota (para oscurecer el fondo de Noticias con movimiento lo justo)
+  require('./services/backdropLumaLab51').installBackdropLumaLab51();
 }

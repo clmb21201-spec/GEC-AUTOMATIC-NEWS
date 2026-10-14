@@ -73,6 +73,10 @@ const STEPS=[
   ['scripts/check-optimization-identity-lab49.js'],
   // Lab.50 · millones con apóstrofo (S/ 3'244,426), romanos delante de un sustantivo («III Simulacro») y apellidos con tilde
   ['scripts/check-speech-lab50.js'],
+  // Lab.51 · masculinos, abreviaturas, teléfonos, horas, códigos, tipo de cambio y fondo detrás del texto
+  ['--check','src/services/speechFixesLab51.js'],
+  ['--check','src/services/backdropLumaLab51.js'],
+  ['scripts/check-speech-lab51.js'],
 ];
 // Python: el mismo "python" que usa package.json (en Linux puede llamarse python3)
 function runPython(args){

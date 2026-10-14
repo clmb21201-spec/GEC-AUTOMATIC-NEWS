@@ -211,7 +211,7 @@ Ver `INTEGRACION_MERLIN.md`, sección "Modelo y animación". Opciones nuevas en 
     - decimales con punto: 1–2 cifras → «punto», con «%» → «por ciento». Los decimales con coma siguen leyéndose «coma».
   - `endWithPunctuation` envuelve `KokoroTTS.prototype.generate` (todas las voces, intervenciones, titulares y Merlín): si el texto no termina en . ! ? …, agrega un punto después de las comillas o paréntesis de cierre. Una coma o un punto y coma final pasan a punto.
 - `qwen_speed_lab31.py` `_trim`: al unir fragmentos deja 120 ms al final (antes 40), para no cortar la caída de la última palabra.
-- Frases de las intervenciones en caché (`presenter-voice/`, `fileFor` en `main.js`): la clave lleva `VOICE_CACHE_REV` (`'lab46'`). Así las frases generadas con versiones anteriores de la voz se vuelven a generar una vez. Hay que subir la revisión cuando cambie la cadena de la voz.
+- Frases de las intervenciones en caché (`presenter-voice/`, `fileFor` en `main.js`): la clave lleva `VOICE_CACHE_REV` (`'lab51'` desde Lab.51). Así las frases generadas con versiones anteriores de la voz se vuelven a generar una vez. Hay que subir la revisión cuando cambie la cadena de la voz.
 - Lab.32 (`documentCodesSpeechLab32.js`, `DOC`) también reconoce carpeta, carpeta fiscal, caso y denuncia, y expediente, informe y acta en minúscula: «la carpeta 17-2026» → «carpeta diecisiete, dos mil veintiséis». Caso, denuncia y carpeta exigen un año en el código, para no tocar «ese caso 2-1».
 - Dato grande de Noticias con movimiento (`newsMotionLab37.js`):
   - `NUM` acepta «3 mil 200», que se muestra «3 200».
@@ -259,6 +259,23 @@ Ver `INTEGRACION_MERLIN.md`, sección "Modelo y animación". Opciones nuevas en 
 - Romanos delante de un sustantivo (`speakNumbers` de Lab.46, paso 6): «el III Simulacro» → «el tercer Simulacro», «la IV edición» → «la cuarta edición», «los XV Juegos» → «los decimoquintos Juegos», «la XXI Bienal» → «la veintiuna Bienal». Solo después de un artículo o determinante, o al empezar la oración o una línea; I, V y X sueltas, solo después de un determinante. Género y número del artículo («la II Guerra»); si no hay, del sustantivo. Hasta 20 en una palabra (undécimo, decimocuarto…), desde 21 cardinal. Lo que ya estaba bien no cambia («León XIV», «siglo XXI», «Juan Pablo II»).
 - Apellidos y palabras con tilde que empiezan con una letra romana, después de otra palabra con mayúscula: «José Cárdenas» se leía «José cienárdenas», «Rosa Vásquez» «Rosa quintoásquez», «Atención Médica» «Atención milédica». Las reglas de romanos de `speechRules0328.js` y `speechNormalizer0326.js` terminaban en `\b`, que en JavaScript no cuenta las vocales con tilde como letras; ahora terminan en `(?![A-Za-z\u00C0-\u024F0-9])` (punto acotado en los dos archivos).
 - Prueba: `scripts/check-speech-lab50.js`, con la cadena completa y el dato grande.
+
+## Lab.51 (más correcciones de lectura y fondo detrás del texto)
+
+- `services/speechFixesLab51.js`, llamado desde `speakNumbers` (Lab.46) en el paso que corresponde:
+  - «uno» delante de un sustantivo masculino: «71 años» → «setenta y un años», «21 heridos» → «veintiún heridos», «1 muerto» → «un muerto» (antes «setenta y uno años»). El femenino de Lab.46 decía «treinta y mil personas»: `fem` solo quita «un» de «un mil» al inicio.
+  - Abreviaturas: Gral., Cmdte., Crnl./Cnel., Tte., Sgto., Ing., Lic., Abog., Arq., Mg., Mons., Pdte./Pdta., Pbro., Prof., Urb., Mz., Lt., Psje., Dpto., Prov., Dist., Cía. (femenino con «la» / «una»: «la Ing.» → «la ingeniera»).
+  - Teléfonos: «Celular 987 654 321» quedaba con la cifra escrita y además dígito por dígito (regla vieja de 0326), y «987654321 de» → «unode». Ahora en grupos: «nueve ocho siete, seis cinco cuatro, tres dos uno»; también celulares sueltos de 9 dígitos y fijos «01 311 5930». Lab.45 ya no junta miles con espacio si empiezan con 0.
+  - Tecnología: «5G» → «cinco ge» (antes «cinco gramos»), «G20» → «ge veinte», «2x1» → «dos por uno».
+  - Hora con «las»: «a las 20:00» → «a las veinte horas» (en notas de deportes la 0328 lo leía «veinte a cero»).
+  - Códigos con guion: «2026-001» → «dos mil veintiséis, uno» (antes «… menos uno»); «2021-2026» → «… a …»; «entre 100-200» → «entre cien y doscientos». Con N°, Ley, Expediente, caso… sigue Lab.32.
+  - Estatura: «1,75 m» → «un metro setenta y cinco». Decimales con coma → «punto», igual que con punto («3,2 %» → «tres punto dos por ciento»).
+- Tipo de cambio (`speakMoney`, Lab.45): «S/ 3.745» con dólar, tipo de cambio, cotización o divisa cerca → «tres punto siete cuatro cinco soles» (antes «tres mil setecientos cuarenta y cinco»). Sin ese contexto sigue siendo miles.
+- Fondo detrás del texto (Noticias con movimiento): antes la foto desenfocada de «Recuadro» y «Dato en grande» bajaba siempre al 62 % de brillo y con fotos muy claras el texto no se leía.
+  - `news-motion.json` → `backdrop: {mode: 'auto'|'manual', level: 0–100}` (por defecto automático, 50).
+  - Salida (bloque al final de `output-news-motion-lab37.js|css`, así vale para `output.html`, `output-web.html` y la vista previa): mide la luminancia de la foto (mitad izquierda para el recuadro, toda para el dato, tercio inferior para foto completa y detalle) y fija `--nm-bright` (brillo de la foto desenfocada) y `--nm-extra` (sombra extra abajo). Primero intenta con canvas; si la foto es de otro sitio (CORS) la pide al proceso principal: IPC `output:imageLuma` (`services/backdropLumaLab51.js`, `nativeImage`, 4 s, 15 MB, caché de 200). Sin medición, valor seguro. En manual, `level` es la oscuridad; en automático, corre lo calculado hacia más claro (<50) o más oscuro (>50). Sombra suave detrás del texto.
+  - Panel: sección «Fondo detrás del texto» en la ventana «Colores, ticker y sonidos…» (automático / manual y control), con la vista previa al instante.
+- Prueba: `scripts/check-speech-lab51.js`.
 
 ## Pendiente
 

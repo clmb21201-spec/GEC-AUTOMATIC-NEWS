@@ -186,3 +186,53 @@
   audioEl.addEventListener('play',loop);audioEl.addEventListener('seeked',loop);
   window.__gecNewsMotionOutput={state:()=>({on:stageEl.classList.contains('nm-on'),plane:plan[curPlane]?.type||'',planes:plan.map(x=>[x.type,+x.start.toFixed(2)]),cards:cardsEl.children.length})};
 })();
+
+// Lab.51 · Fondo detrás del texto. Antes la foto desenfocada de los planos «Recuadro» y «Dato en grande» se oscurecía
+// siempre igual (brillo 62 %): con fotos muy claras (amarillo, blanco) el texto blanco no se leía. Ahora, en automático,
+// se mide qué tan clara es la foto en la zona del texto y se oscurece lo justo; en manual, lo que elija el operador
+// (design.newsMotion.backdrop = {mode:'auto'|'manual', level:0–100}). La foto de otro sitio no se puede leer desde la
+// salida (CORS): se pide al proceso principal (ECAPI.imageLuma); si no se puede medir, oscurecimiento seguro.
+(function(){
+  if(window.__gecNmBackdropLab51)return;window.__gecNmBackdropLab51=true;
+  const layer=document.getElementById('nmLayer');if(!layer)return;
+  const conf=()=>{const m=(typeof design!=='undefined'&&design)?design.newsMotion:null,b=(m&&m.backdrop)||{},l=Number(b.level);return{manual:b.mode==='manual',level:Number.isFinite(l)?Math.max(0,Math.min(100,l)):50};};
+  const cache=new Map();
+  function canvasLuma(src){
+    return new Promise(res=>{
+      const im=new Image();if(!/^data:|^blob:/i.test(src)&&new URL(src,location.href).origin!==location.origin)im.crossOrigin='anonymous';
+      im.onload=()=>{try{const w=48,h=Math.max(1,Math.round(48*im.naturalHeight/Math.max(1,im.naturalWidth))),c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.drawImage(im,0,0,w,h);const d=x.getImageData(0,0,w,h).data;
+        const zone=(x0,x1,y0,y1)=>{let t=0,n=0;for(let y=Math.floor(y0*h);y<Math.ceil(y1*h);y++)for(let xx=Math.floor(x0*w);xx<Math.ceil(x1*w);xx++){const i=(y*w+xx)*4;t+=(0.2126*d[i]+0.7152*d[i+1]+0.0722*d[i+2])/255;n++;}return n?t/n:null;};
+        res({all:zone(0,1,0,1),left:zone(0,.55,0,1),bottom:zone(0,1,.6,1)});}catch{res(null);}};
+      im.onerror=()=>res(null);im.src=src;
+    });
+  }
+  function luma(src){
+    if(!src)return Promise.resolve(null);
+    if(!cache.has(src))cache.set(src,canvasLuma(src).then(r=>r||(window.ECAPI&&typeof window.ECAPI.imageLuma==='function'?window.ECAPI.imageLuma(src).catch(()=>null):null)).catch(()=>null));
+    if(cache.size>120)cache.delete(cache.keys().next().value);
+    return cache.get(src);
+  }
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  // brillo de la foto desenfocada (Recuadro, Dato en grande) y sombra extra abajo (Foto completa, Detalle)
+  function levels(type,L){
+    const c=conf(),bias=(c.level-50)/100; // −0,5 … +0,5
+    if(c.manual){const d=c.level/100;return{bright:clamp(1-d*.85,.12,1),extra:clamp(d*.6,0,.6)};}
+    const lum=L?(type==='side'?L.left:type==='dato'?L.all:L.bottom):null;
+    if(lum==null||!Number.isFinite(lum))return{bright:clamp(.45-bias*.5,.15,.9),extra:clamp(.15+bias*.5,0,.6)};
+    const target=type==='dato'?.22:.26;
+    return{bright:clamp(target/Math.max(lum,.05)-bias*.6,.15,.85),extra:clamp((lum-.35)*1.1+bias*.5,0,.6)};
+  }
+  function apply(el){
+    if(!el||!el.classList||!el.classList.contains('nm-pl'))return;
+    const type=el.classList.contains('nm-side')?'side':el.classList.contains('nm-dato')?'dato':el.classList.contains('nm-zoom')?'zoom':'full';
+    const img=el.querySelector('img'),src=img?(img.getAttribute('src')||img.currentSrc||''):'';
+    const set=v=>{el.style.setProperty('--nm-bright',v.bright.toFixed(3));el.style.setProperty('--nm-extra',v.extra.toFixed(3));};
+    const c=conf();if(c.manual||!src){set(levels(type,null));return;}
+    set(levels(type,null));                                           // mientras se mide: valor seguro
+    luma(src).then(L=>{if(el.isConnected)set(levels(type,L));});
+  }
+  new MutationObserver(list=>{for(const m of list)for(const n of m.addedNodes){if(n.nodeType!==1)continue;if(n.classList.contains('nm-pl'))apply(n);else n.querySelectorAll?.('.nm-pl').forEach(apply);}}).observe(layer,{childList:true,subtree:true});
+  window.__gecNmBackdrop={levels,luma,refresh:()=>layer.querySelectorAll('.nm-pl').forEach(apply)};
+  // al cambiar el diseño (por ejemplo, el control en la vista previa del panel) se recalcula el plano al aire
+  if(typeof window.applyDesign==='function'){const prev=window.applyDesign;window.applyDesign=function(...a){const r=prev.apply(this,a);try{window.__gecNmBackdrop.refresh();}catch{}return r;};}
+})();
