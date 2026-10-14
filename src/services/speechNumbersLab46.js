@@ -12,6 +12,7 @@
 // intervenciones, titulares, Merlín): si el texto no termina en . ! ? … agrega un punto.
 const {integerWords,romanToInt}=require('./speechRules0328');
 const {ordinalWords}=require('./speechNormalizer0326');
+const F51=require('./speechFixesLab51');
 
 const VERSION='lab46-numbers-1';
 const L='(?<![\\p{L}\\p{N}])',R='(?![\\p{L}\\p{N}])';
@@ -41,7 +42,7 @@ function feminine(digits){
   return fem(w);
 }
 function fem(w){
-  return String(w).replace(/ientos(?=\s|$)/g,'ientas').replace(/(^|\s)uno$/,'$1una').replace(/veintiuno$/,'veintiuna').replace(/(^|\s)un mil(?=\s|$)/,'$1mil');
+  return String(w).replace(/ientos(?=\s|$)/g,'ientas').replace(/(^|\s)uno$/,'$1una').replace(/veintiuno$/,'veintiuna').replace(/^un mil(?=\s|$)/,'mil'); // Lab.51: solo al inicio («treinta y un mil» se quedaba «treinta y mil»)
 }
 // ¿sustantivo femenino? lista + terminaciones (-as, -a, -ción, -sión, -dad, -tad, -tud, -umbre), menos las excepciones
 const MASC=new Set(['días','día','problemas','problema','programas','programa','sistemas','sistema','temas','tema','mapas','mapa','climas','clima','idiomas','idioma','planetas','planeta','poemas','poema','dramas','drama','cometas','esquemas','esquema','dilemas','dilema','fantasmas','pijamas','diplomas','diploma','gramos','kilogramos','más','atlas','gas','papás','sofás','sofá','lemas','lema','enigmas','emblemas','teoremas','dogmas','aromas','prismas','síntomas','síntoma','panoramas','crucigramas','sismas']);
@@ -58,11 +59,16 @@ function isFeminineNoun(w){
 
 function speakNumbers(input){
   let s=String(input??''),count=0;const hit=v=>{count++;return v;};
+  const step=fn=>{const next=fn(s);if(next!==s){count++;s=next;}};
+  // Lab.51: abreviaturas de cargos y direcciones, teléfonos, 5G / G20 / 2x1
+  step(F51.expandAbbreviations);step(F51.speakPhones);step(F51.speakTech);
   // 0) fechas con punto, barra o guion: 13.10.2026 → trece de octubre de dos mil veintiséis (antes se leía como hora)
   s=s.replace(/(?<![\d.,/:-])(\d{1,2})([./-])(\d{1,2})\2(\d{4})(?![\d])/g,(m,d,_sep,mo,y)=>{
     const dd=Number(d),mm=Number(mo);if(dd<1||dd>31||mm<1||mm>12)return m;
     return hit(`${dd===1?'primero':words(dd)} de ${MONTHS[mm-1]} de ${words(y)}`);
   });
+  // Lab.51: códigos con guion (2026-001) y rangos de años, después de las fechas
+  step(F51.speakCodes);
   // 12 m. = mediodía
   s=s.replace(new RegExp(`${L}12\\s?m\\.(?!\\p{L})`,'gu'),()=>hit('doce del mediodía'));
   // 1) horas con a. m. / p. m. (8:30 p.m., 10 a.m., 2:13 PM, 9 p. m.). Si la abreviatura cerraba la oración, el punto se conserva.
@@ -76,6 +82,8 @@ function speakNumbers(input){
     const h=Number(hh),mi=Number(mm);if(h>23||mi>59)return m;const h12=h>12?h-12:h===0?12:h;
     return hit(`${hourWord(h12)}${minuteWords(mi)}${rest}`);
   });
+  // Lab.51: «a las 20:00» → «a las veinte horas» (en deportes se tomaba como marcador)
+  step(F51.speakClock);
   // 3) ordinales: 1.º de mayo → primero de mayo; 2.° piso → segundo piso; 3.ª edición → tercera edición; 1er → primer
   s=s.replace(new RegExp(`${L}(\\d{1,3})\\.?\\s?([ºª°]|er|ra|ro|do|da|to|ta)${R}(\\s+(?=(\\p{L}+)))?`,'giu'),(m,num,mark,gap,nextWord)=>{
     const n=Number(num);if(n<1||n>100)return m;
@@ -96,6 +104,8 @@ function speakNumbers(input){
   });
   // 4c) miles con coma (3,200 autos): una coma seguida de exactamente 3 cifras no es decimal
   s=s.replace(/(?<![\d.,])(\d{1,3})((?:,\d{3})+)(?![\d]|[.,]\d)/g,(m,a,rest)=>hit(a+rest.replace(/,/g,'')));
+  // Lab.51: «71 años» → «setenta y un años»
+  step(F51.masculineApocope);
   // 5) decimales con punto (1 o 2 cifras después del punto; 3 cifras = miles): 3.5% → tres punto cinco por ciento
   s=s.replace(new RegExp(`(?<![\\p{L}\\p{N}.,/:])(\\d+)\\.(\\d{1,2})(?![\\d]|\\.\\d|:\\d)(\\s?%)?`,'gu'),(m,a,b,pct)=>{
     const dec=/^0/.test(b)?b.split('').map(words).join(' '):words(b);

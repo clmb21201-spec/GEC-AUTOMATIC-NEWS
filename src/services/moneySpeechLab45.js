@@ -84,8 +84,9 @@ function speakMoney(input){
   text=text.replace(new RegExp(`${B}(\\d+[.,]\\d{1,2})\\s+${SCALE_RX}${E}`,'giu'),(m,num,scale)=>{
     const p=parseAmount(num);if(!p||!p.dec)return m;count++;return scaled(p,scale);
   });
-  // 3) miles separados con espacio: 18 000 → 18000 (sin tocar años ni listas: grupos de exactamente 3 cifras)
-  text=text.replace(/(?<![\d.,])(\d{1,3})((?:[  ]\d{3})+)(?![\d.,]\d|\d)/g,(m,a,rest)=>{count++;return a+rest.replace(/[  ]/g,'');});
+  // 3) miles separados con espacio: 18 000 → 18000 (sin tocar años ni listas: grupos de exactamente 3 cifras; Lab.51: ni
+  //    lo que empieza con 0, como el teléfono fijo «01 311 5930»)
+  text=text.replace(/(?<![\d.,])(?!0\d)(\d{1,3})((?:[  ]\d{3})+)(?![\d.,]\d|\d)/g,(m,a,rest)=>{count++;return a+rest.replace(/[  ]/g,'');});
   return{text,count};
 }
 

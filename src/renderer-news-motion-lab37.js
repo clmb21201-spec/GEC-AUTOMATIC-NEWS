@@ -103,6 +103,13 @@
         </div>
         <p class="note">Los cambios siempre caen en una pausa de la voz. Si apagas la foto completa, la noticia empieza con el primer plano marcado.</p>
       </div>
+      <h3>Fondo detrás del texto</h3>
+      <div class="gec-nm-grid">
+        <label class="gec-nm-check"><input type="radio" name="gecNmBd" value="auto"> Automático (según lo clara que sea la foto)</label>
+        <label class="gec-nm-check"><input type="radio" name="gecNmBd" value="manual"> Manual</label>
+      </div>
+      <label class="gec-nm-check" style="gap:10px"><span id="gecNmBdLbl">Ajuste</span><input type="range" id="gecNmBdLevel" min="0" max="100" step="5" style="flex:1;min-width:140px"><b id="gecNmBdVal" style="min-width:86px"></b></label>
+      <p class="note" id="gecNmBdNote"></p>
       <h3>Sonidos</h3>
       <label class="gec-nm-check"><input type="checkbox" id="gecNmSfxOn"> Efectos de sonido en las transiciones</label>
       <div id="gecNmSfx">
@@ -146,6 +153,9 @@
     document.body.appendChild(bg);
     bg.addEventListener('click', e => { if (e.target === bg) closeModal(); });
     bg.addEventListener('change', e => { if (e.target.name === 'gecNmMode') syncColorLock(); if (e.target.id === 'gecNmLvl') syncCustom(); if (e.target.id === 'gecNmSfxOn') syncSfx(); if (e.target.closest('.gec-nm-left')) schedulePreview(true); });
+    // Lab.51: oscurecer el fondo — el control se ve al instante en la vista previa
+    bg.addEventListener('input', e => { if (e.target.id === 'gecNmBdLevel') { syncBd(); schedulePreview(false); } });
+    bg.addEventListener('change', e => { if (e.target.name === 'gecNmBd') syncBd(); });
     bg.addEventListener('input', e => { if (e.target.closest('.gec-nm-left') && e.target.matches('input[type=color],input:not([type]),textarea')) schedulePreview(false); });
     $('#gecNmPStory').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; pStory = Number(b.dataset.i) || 0; paintPreviewBar(); refreshPreview(true); });
     $('#gecNmPFmt').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; pFmt = b.dataset.f; paintPreviewBar(); refreshPreview(true); });
@@ -181,6 +191,7 @@
         next.ticker.messages = $('#gecNmMsgs').value.split(/\r?\n/);
         next.sfx = {...(cfg.sfx || {}), enabled: $('#gecNmSfxOn').checked, style: $('#gecNmSfxStyle').value, events: {...(cfg.sfx?.events || {})}};
         document.querySelectorAll('#gecNmModal [data-e]').forEach(i => next.sfx.events[i.dataset.e] = i.checked);
+        next.backdrop = {mode: document.querySelector('#gecNmModal input[name=gecNmBd]:checked')?.value === 'manual' ? 'manual' : 'auto', level: Number($('#gecNmBdLevel').value)};
         return next;
   }
   // ---- Lab.40 · vista previa en vivo (output-news-motion-preview.html: la salida real con noticias de ejemplo)
@@ -208,6 +219,13 @@
   function openPreview(){ const f = $('#gecNmPFrame'); paintPreviewBar(); if (f.getAttribute('src')) refreshPreview(true); else f.setAttribute('src', 'output-news-motion-preview.html'); }
   // al cerrar la ventana la vista previa se descarga (no gasta GPU ni suena en segundo plano)
   function closeModal(){ clearTimeout(pTimer); pSeq++; $('#gecNmBg').classList.remove('show'); const f = $('#gecNmPFrame'); if (f) f.removeAttribute('src'); try { f.src = 'about:blank'; f.removeAttribute('src'); } catch {} }
+  // Lab.51 · Fondo detrás del texto: en automático el control corre lo calculado hacia más claro o más oscuro
+  function syncBd(){
+    const manual = document.querySelector('#gecNmModal input[name=gecNmBd]:checked')?.value === 'manual', v = Number($('#gecNmBdLevel').value);
+    $('#gecNmBdLbl').textContent = manual ? 'Oscuridad' : 'Ajuste';
+    $('#gecNmBdVal').textContent = manual ? v + ' %' : v < 50 ? (v <= 20 ? 'Mucho más claro' : 'Más claro') : v > 50 ? (v >= 80 ? 'Mucho más oscuro' : 'Más oscuro') : 'Normal';
+    $('#gecNmBdNote').textContent = manual ? 'Igual para todas las fotos. 0 % = la foto sin oscurecer; 100 % = casi negro.' : 'GEC mide qué tan clara es la foto de cada nota y la oscurece lo necesario para que el texto se lea. Mueve el ajuste si en general lo quieres más claro o más oscuro.';
+  }
   function syncSfx(){ $('#gecNmSfx').classList.toggle('off', !$('#gecNmSfxOn').checked); }
   // «Probar»: suena en el panel con el estilo elegido y el volumen de Música y mezcla (no hace falta guardar)
   let tester = null;
@@ -266,6 +284,7 @@
     $('#gecNmMsgs').value = (cfg.ticker?.messages || []).join('\n');
     const fx = cfg.sfx || {}; $('#gecNmSfxOn').checked = fx.enabled !== false; $('#gecNmSfxStyle').value = fx.style || 'normal';
     document.querySelectorAll('#gecNmModal [data-e]').forEach(i => i.checked = fx.events?.[i.dataset.e] === true); syncSfx();
+    const bd = cfg.backdrop || {}; document.querySelectorAll('#gecNmModal input[name=gecNmBd]').forEach(r => r.checked = r.value === (bd.mode === 'manual' ? 'manual' : 'auto')); $('#gecNmBdLevel').value = String(Number.isFinite(+bd.level) ? +bd.level : 50); syncBd();
     syncColorLock(); $('#gecNmBg').classList.add('show'); openPreview();
   }
   // al cambiar de perfil, la configuración es otra

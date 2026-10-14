@@ -32,7 +32,7 @@ const cases=[
   ['21 familias damnificadas y 1 persona fallecida','veintiuna familias damnificadas y una persona fallecida'],
   ['500 viviendas y 300 escuelas','quinientas viviendas y trescientas escuelas'],
   ['Duró 2 horas','Duró dos horas'],
-  // decimales con punto → «punto»; con coma → «coma»
+  // decimales con punto → «punto»; con coma → «coma» (se dice tal cual lo escrito)
   ['La inflación subió 3.5% en septiembre.','La inflación subió tres punto cinco por ciento en septiembre.'],
   ['un sismo de magnitud 5.8','un sismo de magnitud cinco punto ocho'],
   ['mide 1.75 metros','mide uno punto setenta y cinco metros'],
