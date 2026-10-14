@@ -295,6 +295,13 @@ Ver `INTEGRACION_MERLIN.md`, sección "Modelo y animación". Opciones nuevas en 
 - La ventana OUTPUT no se toca: obligarla a soltar el teclado haría saltar el panel encima al hacerle clic.
 - Prueba: `scripts/check-control-focus-lab53.js`.
 
+## Lab.54 (los efectos de transición no sonaban)
+
+- Síntoma: con los sonidos activados y nivel Normal no se oía ni el woosh ni el golpe de marca, ni en OUTPUT ni en OBS (página LAN).
+- Causa: `output-sfx-lab39.js` callaba los efectos con `output:control` `pause` **o `stop`**, y solo los volvía a habilitar con `play`. La automatización manda `stop` al detener la emisión, después de la despedida y cuando una pieza falla o se demora, y las piezas siguientes llegan sin `play`: el resto de la sesión no sonaba nada. En la vista previa del panel no pasaba porque no manda `stop`.
+- Ahora solo `pause` los calla; `play` y cada `output:story` nuevo (noticia, contenido, intervención) los habilitan. Vale para la salida, `output-web.html` (OBS) y la ventana de NDI, que cargan el mismo archivo.
+- Prueba: `scripts/check-sfx-stop-lab54.js` (falla con el código anterior).
+
 ## Pendiente
 
 - Integrar en modo Merlín el envío por NDI (hoy NDI queda bloqueado con aviso en modo Merlín).

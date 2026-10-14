@@ -84,6 +84,8 @@ const STEPS=[
   ['--check','src/services/controlFocusLab53.js'],
   ['--check','src/renderer-focus-lab53.js'],
   ['scripts/check-control-focus-lab53.js'],
+  // Lab.54 · los efectos de transición vuelven a sonar después de detener la emisión
+  ['scripts/check-sfx-stop-lab54.js'],
 ];
 // Python: el mismo "python" que usa package.json (en Linux puede llamarse python3)
 function runPython(args){
