@@ -302,6 +302,14 @@ Ver `INTEGRACION_MERLIN.md`, sección "Modelo y animación". Opciones nuevas en 
 - Ahora solo `pause` los calla; `play` y cada `output:story` nuevo (noticia, contenido, intervención) los habilitan. Vale para la salida, `output-web.html` (OBS) y la ventana de NDI, que cargan el mismo archivo.
 - Prueba: `scripts/check-sfx-stop-lab54.js` (falla con el código anterior).
 
+## Lab.55 (limitador final de la salida)
+
+- Síntoma: a veces el audio «reventaba» un instante (no un chasquido). La voz llega casi al máximo (picos ~99 %); voz, música, contenido y efectos de transición sonaban por separado y la suma podía pasar del 100 % y recortarse. El canal de los efectos además se abría con el primer efecto, a mitad de una noticia.
+- `output-limiter-lab55.js` (preload lo carga en `output.html`; también `output-web.html` y `outputLanServer.js` para OBS; no en la ventana de NDI ni en Merlín): al cargar abre un solo AudioContext y conecta cada `<audio>`/`<video>` (MutationObserver) a una mezcla → limitador (DynamicsCompressor -3 dB, 20:1, ataque 1 ms, salida 120 ms) → recorte suave por encima de ~-1 dB → parlantes. Si el AudioContext no llega a `running`, no conecta nada (todo suena como antes, sin limitador). `window.__gecMaster = {ctx, input, limiter, running}`.
+- Efectos (`output-sfx-lab39.js`): fuera de NDI van a `__gecMaster.input`. NDI (`output-ndi-audio.js`): limitador entre la mezcla y el envío.
+- Medido en Chromium: voz al máximo + golpe de marca = pico 1,06 sin limitador, 0,89 con él; la voz por `file://` sigue sonando (igual que la mezcla de NDI desde Lab.25).
+- Prueba: `scripts/check-output-limiter-lab55.js`.
+
 ## Pendiente
 
 - Integrar en modo Merlín el envío por NDI (hoy NDI queda bloqueado con aviso en modo Merlín).

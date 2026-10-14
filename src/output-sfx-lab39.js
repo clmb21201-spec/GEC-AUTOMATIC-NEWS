@@ -6,7 +6,8 @@
 (function installOutputSfxLab39(){
   if (!window.GECSfx) { setTimeout(installOutputSfxLab39, 80); return; }
   if (window.__gecSfx) return;
-  const engine = window.GECSfx.create(() => { const n = window.__GEC_NDI_AUDIO__; return n && n.ctx && n.mix ? {context: n.ctx, dest: n.mix} : {}; });
+  // Lab.55: fuera de NDI, los efectos van a la mezcla común con limitador (output-limiter-lab55.js), abierta al cargar
+  const engine = window.GECSfx.create(() => { const n = window.__GEC_NDI_AUDIO__; if (n && n.ctx && n.mix) return {context: n.ctx, dest: n.mix}; const m = window.__gecMaster; return m && m.ctx && m.input ? {context: m.ctx, dest: m.input} : {}; });
   const cfg = () => { try { return (typeof design !== 'undefined' && design && design.newsMotion && design.newsMotion.sfx) || {}; } catch { return {}; } };
   let paused = false;
   // Lab.54: solo la pausa calla los efectos. Antes «stop» (detener la emisión, despedida, una pieza que falla) también
