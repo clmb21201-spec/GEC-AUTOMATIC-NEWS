@@ -80,6 +80,10 @@ const STEPS=[
   // Lab.52 · voz de las intervenciones (mejor toma, respiro, caché) e indicador de tiempo del Generador de offs
   ['--check','src/services/hostVoiceLab52.js'],
   ['scripts/check-host-voice-lab52.js'],
+  // Lab.53 · el panel recupera el teclado aunque la ventana OUTPUT haya quedado activa
+  ['--check','src/services/controlFocusLab53.js'],
+  ['--check','src/renderer-focus-lab53.js'],
+  ['scripts/check-control-focus-lab53.js'],
 ];
 // Python: el mismo "python" que usa package.json (en Linux puede llamarse python3)
 function runPython(args){

@@ -287,6 +287,14 @@ Ver `INTEGRACION_MERLIN.md`, sección "Modelo y animación". Opciones nuevas en 
 - Generador de offs: `offs:generate` manda `doneChars`, `totalChars`, `paraChars` y `rtf` (velocidad medida de la voz, `offs:status` también la trae). El panel muestra barra por cantidad de texto, tiempo transcurrido, restante (con la velocidad real de los párrafos hechos; antes del primero, con la de la optimización) y «⚠ Este párrafo está tardando más de lo normal…» si pasa de 3 veces lo esperado (mínimo 25 s). En el paso ② suma «se genera en ~X».
 - Prueba: `scripts/check-host-voice-lab52.js`.
 
+## Lab.53 (no se podía escribir en el panel con la salida activa)
+
+- Síntoma: durante la emisión, en «+ Añadir pronunciación» (Gestionar aprendizaje) las casillas no dejaban escribir; la ventana OUTPUT estaba a medio ocultar. En una simulación del panel completo con la emisión en marcha sí se escribía: no hay bloqueo, capa encima ni atajo de teclado. Causa probable: la ventana OUTPUT queda con el teclado y Electron, en Windows, a veces no se lo devuelve a la página del panel al hacer clic.
+- `services/controlFocusLab53.js` (se instala al final de `bootstrap-v2lab.js`): `ui:focusControl` busca el panel por su página (`control.html`); la regla de 0329 tomaba la primera ventana sin «OUTPUT» en el título, que puede ser la oculta de NDI. Al activarse el panel se le devuelve el teclado en el acto y 120 ms después.
+- `renderer-focus-lab53.js` (preload lo inyecta en el panel): si haces clic en una casilla de texto y la página no tiene el teclado (`document.hasFocus()`), pide `focusControl` y vuelve a enfocar la casilla.
+- La ventana OUTPUT no se toca: obligarla a soltar el teclado haría saltar el panel encima al hacerle clic.
+- Prueba: `scripts/check-control-focus-lab53.js`.
+
 ## Pendiente
 
 - Integrar en modo Merlín el envío por NDI (hoy NDI queda bloqueado con aviso en modo Merlín).
