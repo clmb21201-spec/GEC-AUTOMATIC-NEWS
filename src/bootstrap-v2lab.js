@@ -72,4 +72,8 @@ if(!gotLock){app.quit();}else{
   require('./services/optimizationIdentityLab49').installOptimizationIdentityLab49();
   // Lab.51: qué tan clara es la foto de cada nota (para oscurecer el fondo de Noticias con movimiento lo justo)
   require('./services/backdropLumaLab51').installBackdropLumaLab51();
+  // Lab.52: voz de las intervenciones con la mejor toma (cierre con el tono hacia abajo) y respiro al final
+  require('./services/hostVoiceLab52').installHostVoiceLab52();
+  // Lab.53: el panel recupera el teclado aunque la ventana OUTPUT haya quedado activa
+  require('./services/controlFocusLab53').installControlFocusLab53();
 }

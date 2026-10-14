@@ -153,7 +153,9 @@ function installOffsLab47({api=null,electron=null}={}){
   const send=(ch,p)=>{for(const w of BrowserWindow.getAllWindows())try{if(!w.isDestroyed())w.webContents.send(ch,p);}catch{}};
   const state={busy:false,cancel:false,stage:''};
   const progress=p=>send('offs:progress',{...p,busy:state.busy});
-  const status=()=>({ok:true,version:VERSION,...engineBusy(engine()),busy:state.busy,stage:state.stage,config:config(),history:history().slice(0,20)});
+  // Lab.52: velocidad medida de la voz (RTF: segundos de cálculo por segundo de audio) para estimar cuánto tarda el off
+  const voiceRtf=()=>{try{const x=settings()||{},r=Number(x.optimization0321?.voice?.medianRtf||x.activeOptimizationV2?.tts?.expectedRtf||x.tts?.lastBenchmark?.bestRealtimeFactor||0);return r>0&&r<20?Math.round(r*100)/100:0;}catch{return 0;}};
+  const status=()=>({ok:true,version:VERSION,...engineBusy(engine()),busy:state.busy,stage:state.stage,config:config(),history:history().slice(0,20),rtf:voiceRtf()});
   const handle=(k,fn)=>{try{ipcMain.removeHandler(k);}catch{}ipcMain.handle(k,async(...a)=>{try{return await fn(...a);}catch(e){return{ok:false,error:String(e?.message||e),code:e?.code||''};}});};
   const settings=()=>{const e=engine();return e?.getSettings?.()||{};};
   const guard=()=>{const b=engineBusy(engine());if(b.blocked){const e=new Error(b.reason);e.code='OFFS_BLOCKED';throw e;}if(state.busy){const e=new Error('Ya hay un off en proceso.');e.code='OFFS_BUSY';throw e;}};
@@ -210,14 +212,16 @@ function installOffsLab47({api=null,electron=null}={}){
     const e=engine(),k=e?.kokoro,s=settings();if(!k?.generate)throw new Error('La voz todavía no está lista.');
     const local=e?.providers?.localRuntime;try{await(local?.stopAndWaitExit?.('offs')??local?.stop?.('offs'));}catch{}
     const parts=[],durations=[];let rate=0;
+    // Lab.52: avance por cantidad de texto (no por párrafos) y velocidad de la voz, para el tiempo restante del panel
+    const totalChars=paras.reduce((a,x)=>a+x.length,0),rtf=voiceRtf();let doneChars=0;
     for(let i=0;i<paras.length;i++){
       if(state.cancel)throw new Error('Cancelado.');
-      progress({stage:'generate',index:i+1,total:paras.length});
+      progress({stage:'generate',index:i+1,total:paras.length,doneChars,totalChars,paraChars:paras[i].length,rtf});
       const a=await k.generate(paras[i],{voice:s.tts?.voice,speed:s.tts?.speed});
       if(!a?.path||!fs.existsSync(a.path))throw new Error(`La voz no devolvió audio en el párrafo ${i+1}.`);
       const w=readWavFloat(a.path);try{k.cleanupAudio?.(a.path);}catch{}
       const x=rate&&w.rate!==rate?resample(w.samples,w.rate,rate):w.samples;if(!rate)rate=w.rate;
-      parts.push(x);durations.push(x.length/rate);
+      parts.push(x);durations.push(x.length/rate);doneChars+=paras[i].length;
     }
     progress({stage:'mix'});
     const joined=joinParagraphs(parts,rate),lv=levelize(joined.samples,rate),out=resample(lv.samples,rate,OUT_RATE);

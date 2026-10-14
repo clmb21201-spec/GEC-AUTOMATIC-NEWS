@@ -335,7 +335,10 @@ const presenterHost=(()=>{
   function cacheDir(){try{return path.join(dataDir||portableDataDir(),'presenter-voice');}catch{return path.join(app.getPath('userData'),'presenter-voice');}}
   function voiceKey(){const s=settingsStore?.load?.()||{};return JSON.stringify({voice:s.tts?.voice||'',speed:s.tts?.speed||1,engine:s.tts?.engine||s.tts?.primaryEngine||''});}
   // VOICE_CACHE_REV: al cambiar la cadena de la voz (Lab.41 murmullos, Lab.46 final de la última palabra) las frases se vuelven a generar una vez
-const VOICE_CACHE_REV='lab51';function fileFor(text){return path.join(cacheDir(),crypto.createHash('sha1').update(voiceKey()+'|'+VOICE_CACHE_REV+'|'+text).digest('hex').slice(0,16)+'.wav');}
+const VOICE_CACHE_REV='lab52';
+  // Lab.52: mejor de 3 tomas (la que cierra con el tono hacia abajo) y 0,45 s de respiro al final (services/hostVoiceLab52.js)
+  const hostVoice=()=>globalThis.__gecHostVoiceLab52||null;
+  const hostGenerate=(t,o,x)=>hostVoice()?hostVoice().generate(kokoro,t,o,{...(x||{}),log:m=>logEvent('PRESENTER_TTS',m)}):kokoro.generate(t,o);function fileFor(text){return path.join(cacheDir(),crypto.createHash('sha1').update(voiceKey()+'|'+VOICE_CACHE_REV+'|'+text).digest('hex').slice(0,16)+'.wav');}
   const ready=f=>{try{return fs.statSync(f).size>1000;}catch{return false;}};
   // Merlín solo habla si la salida muestra de verdad su página: si WebGL o el modelo fallan, la salida vuelve a output.html
   // aunque el modo siga en 'merlin', y la clásica trataba la intervención como una noticia vacía (y su 'ended' como el de la noticia).
@@ -348,8 +351,9 @@ const VOICE_CACHE_REV='lab51';function fileFor(text){return path.join(cacheDir()
   const hostActive=()=>active()||classicOn();
   const phraseList=key=>classicOn()?classicHost().phrasesNow(key):(loadPhrases()[key]||[]);
   async function ensureClips(){if(generating)return generating;if(!kokoro||!settingsStore)return;generating=(async()=>{const classic=classicOn(),ph=classic?null:loadPhrases();fs.mkdirSync(cacheDir(),{recursive:true});
-    for(const seg of SEGS)for(const text of(classic?classicHost().phrasesAll(seg):ph[seg])){const f=fileFor(text);if(ready(f))continue;
-      try{const s=settingsStore.load(),a=await kokoro.generate(text,{voice:s.tts.voice,speed:s.tts.speed});if(a?.path&&fs.existsSync(a.path)){fs.copyFileSync(a.path,f);durations[f]=Number(a.durationSec)||0;try{kokoro.cleanupAudio?.(a.path);}catch{}}}
+    hostVoice()?.cleanupOnce?.(cacheDir());
+    for(const seg of SEGS)for(const text of(classic?classicHost().phrasesAll(seg):ph[seg])){const f=fileFor(text);if(ready(f)){hostVoice()?.touch?.(f);continue;}
+      try{const s=settingsStore.load(),a=await hostGenerate(text,{voice:s.tts.voice,speed:s.tts.speed});if(a?.path&&fs.existsSync(a.path)){fs.copyFileSync(a.path,f);durations[f]=Number(a.durationSec)||0;try{kokoro.cleanupAudio?.(a.path);}catch{}}}
       catch(e){logEvent('PRESENTER_TTS',`${seg}: ${e.message||e}`);}}
   })().finally(()=>{generating=null;});return generating;}
   function pick(seg){const list=phraseList(seg).map((text,i)=>({text,i,file:fileFor(text)})).filter(x=>ready(x.file));if(!list.length)return null;
@@ -371,7 +375,7 @@ const VOICE_CACHE_REV='lab51';function fileFor(text){return path.join(cacheDir()
       const clip=f?{text,file:f,durationSec:durations[f]||0}:pick(seg);
       if(!clip||!sendHost(seg,clip,origDeliver,after,{...extra,...classicExtra()})){try{after('skip');}catch(e){logEvent('PRESENTER_AFTER',e.message||e);}}}).catch(e=>{logEvent('PRESENTER_TTS',`${seg}: ${e.message||e}`);if(pending===mine)finish('error');});
     return true;}
-  async function speakToFile(text){const f=fileFor(text);if(ready(f))return f;const s=settingsStore.load(),a=await kokoro.generate(text,{voice:s.tts.voice,speed:s.tts.speed});if(!a?.path||!fs.existsSync(a.path))return null;fs.mkdirSync(cacheDir(),{recursive:true});fs.copyFileSync(a.path,f);durations[f]=Number(a.durationSec)||0;try{kokoro.cleanupAudio?.(a.path);}catch{}return f;}
+  async function speakToFile(text){const f=fileFor(text);if(ready(f))return f;const s=settingsStore.load(),a=await hostGenerate(text,{voice:s.tts.voice,speed:s.tts.speed},{tries:1});if(!a?.path||!fs.existsSync(a.path))return null;fs.mkdirSync(cacheDir(),{recursive:true});fs.copyFileSync(a.path,f);durations[f]=Number(a.durationSec)||0;try{kokoro.cleanupAudio?.(a.path);}catch{}return f;}
   function sendHost(seg,clip,origDeliver,after,extra){
     const ok=origDeliver({kind:'host',segment:seg,title:'',summary:'',audioUrl:toUrl(clip.file).href,audioDurationSec:clip.durationSec,hostText:clip.text,speechSegments:speechSegmentsFor(clip.file),audioGainDb:gainDbFor(clip.file),...extra},'automatic',false);
     if(!ok)return false;pending={after};pendingTimer=setTimeout(()=>finish('timeout'),Math.min(16000,Math.max(5000,((clip.durationSec||9)+4)*1000)));logEvent('PRESENTER_HOST',`${seg}: ${clip.text}`);return true;}
